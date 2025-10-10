@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Podiums Calor Run</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥇</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root {
+    --primary-color: #215E99;
+    --secondary-color: #E61780;
+    --bg-white: #fff;
+    --bg-light: #f9f9f9;
+    --shadow: rgba(0, 0, 0, 0.15);
+    --border-radius: 0.5rem;
+    --max-width: 62.5rem;
+    --text-dark: #333;
+    --border-light: #ddd;
+    --header-bg: #e0e0e0;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height: 1.5;
+    color: var(--text-dark);
+    min-height: 100vh;
+    padding: 1.25rem;
+    position: relative;
+}
+body::before {
+  content:''; position: fixed; inset:0;
+  background: linear-gradient(0.25turn, var(--primary-color), var(--secondary-color));
+  opacity:0.3;
+  z-index:-1;
+  pointer-events: none;
+}
+.container { max-width: var(--max-width); margin:0 auto; }
+.header {
+  text-align:center;
+  margin-bottom:0.625rem;
+  color: var(--primary-color);
+  font-size:1.3rem;
+  font-weight:bold;
+  padding:1.25rem 1.25rem 3.75rem;
+  background:url('calor.png') center/contain no-repeat;
+}
+.table-container {
+  max-width: var(--max-width);
+  overflow-x:auto;
+  margin:0 auto 1.25rem;
+  background: var(--bg-white);
+  border-radius: var(--border-radius);
+  box-shadow: 0 0.25rem 0.75rem var(--shadow);
+}
+table { width:100%; border-collapse: collapse; table-layout: fixed; min-width:43.75rem; }
+th, td { padding:0.375rem 0.5rem; border-bottom:1px solid var(--border-light); text-align:left; white-space: nowrap; }
+th { background: var(--header-bg); font-weight:600; position:sticky; top:0; z-index:10; }
+table th:nth-child(1),
+table td:nth-child(1) { width: 90px; text-align: left; }
+table th:nth-child(2),
+table td:nth-child(2) { width: auto; }
+table th:nth-child(3),
+table td:nth-child(3) { width: auto; }
+table th:nth-child(4),
+table td:nth-child(4) { width: 90px; text-align: center; }
+table th:nth-child(5),
+table td:nth-child(5) { width: 100px; text-align: center; }
+tbody tr:nth-child(even){ background: var(--bg-light); }
+.text-center { text-align:center; }
+.loading { text-align:center; padding:1.25rem 0; font-size:1rem; }
+.hidden { display:none; }
+
+.filter-bar { text-align:center; margin-bottom:1rem; }
+.filter-bar a {
+    margin:0 0.5rem;
+    font-size:1rem;
+    cursor:pointer;
+    text-decoration:none;
+    color: var(--primary-color);
+}
+.filter-bar a.active { font-weight:bold; }
+.filter-bar select {
+    margin-left:1rem;
+    padding:0.25rem 0.5rem;
+    font-size:0.9rem;
+    border:1px solid var(--primary-color);
+    border-radius: var(--border-radius);
+    background: var(--bg-white);
+    color: var(--text-dark);
+}
+
+@media (max-width: 768px) {
+  .header { margin-bottom:0.625rem; padding:0rem 0rem 1.5rem; font-size:1rem; }
+  table { font-size:0.85rem; }
+  th, td { padding:0.375rem 0.5rem; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">PODIUMS CALOR RUN</div>
+    <div class="filter-bar hidden" id="filter-bar">
+        <a data-course="10km" class="filter-course">10 km</a> |
+        <a data-course="20km" class="filter-course">20 km</a>
+        <select id="filter-cat">
+            <option value="">Toutes catégories</option>
+        </select>
+    </div>
+</div>
+
+<div id="tables" class="hidden">
+
+  <!-- Tableau Hommes -->
+  <div class="table-container">
+      <h3 style="color:var(--primary-color);">&nbsp;Podium Hommes</h3>
+      <table id="table-homme">
+          <thead>
+              <tr>
+                  <th>Podium</th>
+                  <th>Nom</th>
+                  <th>Prénom</th>
+                  <th>Temps</th>
+                  <th>Catégorie</th>
+              </tr>
+          </thead>
+          <tbody></tbody>
+      </table>
+  </div>
+
+  <!-- Tableau Femmes -->
+  <div class="table-container">
+      <h3 style="color:var(--secondary-color);">&nbsp;Podium Femmes</h3>
+      <table id="table-femme">
+          <thead>
+              <tr>
+                  <th>Podium</th>
+                  <th>Nom</th>
+                  <th>Prénom</th>
+                  <th>Temps</th>
+                  <th>Catégorie</th>
+              </tr>
+          </thead>
+          <tbody></tbody>
+      </table>
+  </div>
+  <div id="loading" class="loading">Connexion...</div>
+</div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script>
+'use strict';
+
+const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAIAAz51gEGKQd0EoqA3yUhvnqw3DkQiIo",
+    authDomain: "calor-run.firebaseapp.com",
+    databaseURL: "https://calor-run-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "calor-run",
+    storageBucket: "calor-run.firebasestorage.app",
+    messagingSenderId: "329949291334",
+    appId: "1:329949291334:web:c71ef20268c609cf953b47",
+    measurementId: "G-YVQPW6JGPK"
+};
+
+const COURSE_ALIASES = { '10': '10km', '10km': '10km', '10 km': '10km', '20': '20km', '20km': '20km', '20 km': '20km' };
+
+const elements = {
+    loading: document.getElementById('loading'),
+    filterBar: document.getElementById('filter-bar'),
+    filterCat: document.getElementById('filter-cat'),
+    tables: document.getElementById('tables'),
+    tableHomme: document.querySelector('#table-homme tbody'),
+    tableFemme: document.querySelector('#table-femme tbody')
+};
+
+let departureTimestamp = null;
+let participants = {};
+let scans = {};
+let selectedCourse = '10km'; // par défaut
+
+const app = firebase.initializeApp(FIREBASE_CONFIG);
+const db = firebase.database();
+
+function formatTime(ms) {
+    const totalSeconds = Math.floor(Math.abs(ms) / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+}
+
+function getTop3Filtered(courseFilter, catFilter, genreFilter){
+    const classement = Object.keys(scans).map(dossard=>{
+        const scan=scans[dossard], p=participants[dossard]||{};
+        const tempsMs = new Date(scan.dateTime).getTime()-departureTimestamp;
+        return {nom:p.nom||'', prenom:p.prenom||'', tempsMs, tempsStr: formatTime(tempsMs), categorie:p.categorie||'', course:p.course||'', genre:p.genre||''};
+    }).filter(p=>{
+        const courseNorm = COURSE_ALIASES[p.course]||p.course;
+        const catOk = !catFilter || p.categorie === catFilter;
+        const courseOk = !courseFilter || courseNorm === courseFilter;
+        const genreOk = !genreFilter || p.genre===genreFilter;
+        return catOk && courseOk && genreOk;
+    }).sort((a,b)=>a.tempsMs-b.tempsMs);
+    return classement.slice(0,3);
+}
+
+function renderTable(tbody, data, isFemme=false){
+    tbody.innerHTML='';
+    const podiums = isFemme ? ['🥇 1ère','🥈 2ème','🥉 3ème'] : ['🥇 1er','🥈 2ème','🥉 3ème'];
+    podiums.forEach((podium,i)=>{
+        const p = data[i];
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${podium}</td>
+                        <td>${p?p.nom:''}</td>
+                        <td>${p?p.prenom:''}</td>
+                        <td>${p?p.tempsStr:''}</td>
+                        <td>${p?p.categorie:''}</td>`;
+        tbody.appendChild(tr);
+    });
+}
+
+function updateTables(){
+    const catFilter = elements.filterCat.value;
+    const topH = getTop3Filtered(selectedCourse, catFilter, 'H');
+    const topF = getTop3Filtered(selectedCourse, catFilter, 'F');
+    renderTable(elements.tableHomme, topH, false);
+    renderTable(elements.tableFemme, topF, true);
+}
+
+function populateCategories(){
+    const cats = new Set(Object.values(participants).map(p=>p.categorie).filter(Boolean));
+
+    // Trouver le plus grand Mx présent
+    let maxM = 0;
+    cats.forEach(c=>{
+        if(/^M\d+$/.test(c)){
+            const num = parseInt(c.slice(1));
+            if(num > maxM) maxM = num;
+        }
+    });
+
+    // Ordre fixe
+    const order = ["CA","JU","ES","SE"];
+
+    // Ajout dynamique des Mx (jusqu'au max existant, max 10)
+    for(let i=0; i<=Math.min(maxM,10); i++){
+        order.push("M"+i);
+    }
+
+    elements.filterCat.innerHTML='<option value="">Toutes catégories</option>';
+    order.forEach(c=>{
+        if(cats.has(c)){
+            const opt=document.createElement('option');
+            opt.value=c;
+            opt.textContent=c;
+            elements.filterCat.appendChild(opt);
+        }
+    });
+}
+
+db.ref('data/depart_course').on('value', snapshot=>{
+    departureTimestamp=snapshot.exists()?new Date(snapshot.val()).getTime():null;
+});
+
+db.ref('participants').on('value', snapshot=>{
+    participants=snapshot.val()||{};
+    elements.loading.classList.add('hidden');
+    elements.filterBar.classList.remove('hidden');
+    elements.tables.classList.remove('hidden');
+    populateCategories();
+    updateTables();
+
+    // Marquer le 10 km actif par défaut
+    document.querySelectorAll('.filter-course').forEach(a=>{
+        if(a.dataset.course === selectedCourse) a.classList.add('active');
+    });
+});
+
+db.ref('scan_dossards').on('value', snapshot=>{
+    scans=snapshot.val()||{};
+    updateTables();
+});
+
+elements.filterCat.addEventListener('change', updateTables);
+document.querySelectorAll('.filter-course').forEach(link=>{
+    link.addEventListener('click', e=>{
+        selectedCourse = e.target.dataset.course;
+        document.querySelectorAll('.filter-course').forEach(b=>b.classList.remove('active'));
+        e.target.classList.add('active');
+        updateTables();
+    });
+});
+</script>
+</body>
+</html>

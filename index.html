@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calor Run</title>
+<link rel="icon" type="image/png" href="ico.png?v=1">
+<style>
+:root {
+  --primary-color: #215E99;
+  --secondary-color: #E61780;
+  --bg-white: #fff;
+  --shadow: rgba(0,0,0,0.15);
+  --border-radius: 0.5rem;
+  --max-width: 62.5rem;
+  --text-dark: #333;
+}
+* { box-sizing: border-box; margin:0; padding:0; }
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+  color: var(--text-dark);
+  min-height: 100vh;
+  padding: 1.25rem;
+  position: relative;
+}
+body::before {
+  content:''; position: fixed; inset:0;
+  background: linear-gradient(0.25turn, var(--primary-color), var(--secondary-color));
+  opacity:0.3;
+  z-index:-1;
+  pointer-events: none;
+}
+.container { max-width: var(--max-width); margin:0 auto; }
+.header {
+  text-align:center;
+  margin-bottom:1rem;
+  color: var(--primary-color);
+  font-size:1.3rem;
+  font-weight:bold;
+  padding:1.25rem 1.25rem 3.75rem;
+  background:url('calor.png') center/contain no-repeat;
+}
+
+.button-row {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.button-row .button {
+  width: 17ch;
+  padding: 0.75rem 1rem;
+  border-radius: var(--border-radius);
+  background: var(--primary-color);
+  color: #fff;
+  font-size: 1rem;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 0.25rem 0.5rem rgba(0,0,0,0.15);
+  transition: background 0.3s;
+}
+.button-row .button:hover {
+  background: var(--secondary-color);
+}
+
+.separator {
+  border: none;
+  border-top: 2px solid var(--primary-color);
+  margin: 1.5rem 0;
+  width: 50%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media(max-width:768px){
+  .header { margin-bottom:0.625rem; padding:0rem 0rem 1.5rem; font-size:1rem; }
+  .button-row {
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .button-row .button {
+    width: 90%;
+    max-width: 15em;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header" id="page-title"></div>
+
+  <div class="button-row">
+    <a href="https://gregb77.github.io/calor_run/live_trail.html" class="button">Live Trail</a>
+    <a href="https://gregb77.github.io/calor_run/participants.html" class="button">Participants</a>
+    <a href="https://gregb77.github.io/calor_run/statistiques.html" class="button">Statistiques</a>
+  </div>
+
+  <hr class="separator">
+
+  <div class="button-row">
+    <a href="https://gregb77.github.io/calor_run/podiums.html" class="button">Podiums</a>
+  </div>
+  
+  <div class="button-row">
+    <a href="https://gregb77.github.io/calor_run/resultats.html?distance=10" class="button">Résultats 10 km</a>
+    <a href="https://gregb77.github.io/calor_run/resultats.html?distance=20" class="button">Résultats 20 km</a>
+  </div>
+</div>
+
+<script>
+  const year = new Date().getFullYear();
+  document.title = `Calor Run ${year}`;
+  document.getElementById("page-title").textContent = `CALOR RUN ${year}`;
+</script>
+
+</body>
+</html>

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Participants Calor Run</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏃‍♀️</text></svg>">
+  <style>
+    :root {
+      --primary-color: #215E99;
+      --secondary-color: #E61780;
+      --bg-white: #fff;
+      --bg-light: #f9f9f9;
+      --shadow: rgba(0,0,0,0.15);
+      --border-radius: 0.5rem;
+      --max-width: 62.5rem;
+      --text-dark: #333;
+      --border-light: #ddd;
+      --header-bg: #e0e0e0;
+      --bg-overlay: rgba(33, 94, 153, 0.3);
+      --hover-blue: #e9f7ff;
+      --transition-smooth: 0.3s ease;
+    }
+    * { box-sizing: border-box; margin:0; padding:0; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      line-height: 1.5;
+      color: var(--text-dark);
+      min-height: 100vh;
+      padding: 1.25rem;
+      position: relative;
+    }
+    body::before {
+      content:''; position: fixed; inset:0;
+      background: linear-gradient(0.25turn, var(--primary-color), var(--secondary-color));
+      opacity:0.3; z-index:-1; pointer-events: none;
+    }
+    .container { max-width: var(--max-width); margin:0 auto; }
+    .header {
+      text-align:center; margin-bottom:0.625rem; color: var(--primary-color);
+      font-size:1.3rem; font-weight:bold; padding:1.25rem 1.25rem 3.75rem;
+      background:url('calor.png') center/contain no-repeat;
+    }
+    .search-counter-container {
+      display:flex; flex-wrap:nowrap; justify-content:space-between;
+      align-items:center; gap:0.625rem; margin-bottom:1.25rem;
+    }
+    #search {
+      flex:1; padding:0.5rem 0.75rem; border:none; border-bottom:1px solid #888;
+      background:transparent; color: var(--text-dark); font-size:1rem;
+      outline:none; transition:border-color 0.3s;
+    }
+    #search:focus { border-bottom-color: var(--primary-color); }
+    #counter { margin:0 0.25rem; color:#000; font-weight:normal; }
+    .counter-10km { color: var(--primary-color); }
+    .counter-20km { color: var(--secondary-color); }
+    .table-container {
+      max-width: var(--max-width); overflow-x:auto; margin:0 auto 1.25rem;
+      background: var(--bg-white); border-radius: var(--border-radius);
+      box-shadow: 0 0.25rem 0.75rem var(--shadow);
+    }
+    table { width:100%; border-collapse:collapse; min-width:43.75rem; }
+    th, td {
+      padding:0.375rem 0.5rem; border-bottom:1px solid var(--border-light);
+      text-align:left; white-space:nowrap;
+    }
+    th {
+      background: var(--header-bg); font-weight:600;
+      position:sticky; top:0; z-index:10;
+    }
+    tbody tr:nth-child(even){ background: var(--bg-light); }
+    .text-center { text-align:center; }
+    .loading { text-align:center; padding:1.25rem 0; font-size:1rem; }
+    .hidden { display:none; }
+    .sort-indicator {
+      position:absolute; top:50%; transform:translateY(-50%);
+      border-left:5px solid transparent; border-right:5px solid transparent;
+      border-bottom:6px solid rgba(0,0,0,0.4); opacity:0.5;
+      transition: all var(--transition-smooth); pointer-events:none;
+    }
+    th.sorted .sort-indicator { opacity:1; border-bottom-color: var(--primary-color); }
+    th.sorted.desc .sort-indicator { transform:translateY(-50%) rotate(180deg); }
+    .header-label { display:inline-block; vertical-align:middle; margin-right:4px; }
+    .no-results { text-align:center; padding:40px; color:#666; font-style:italic; }
+    @media(max-width:768px){
+      .header { margin-bottom:0.625rem; padding:0 0 1.5rem; font-size:1rem; }
+      .search-counter-container { justify-content:center; flex-direction:column; gap:0.625rem; margin-bottom:0.625rem; }
+      #search, #counter { font-size:0.75rem; text-align:center; width:100%; padding:0; max-width:none; flex:none; }
+      table { font-size:0.85rem; }
+      th, td { padding:0.375rem 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">PARTICIPANTS CALOR RUN</div>
+    <div class="search-counter-container">
+      <input type="text" id="search" placeholder="Rechercher par nom, prénom, club ou catégorie (ex: HM0, FSE)" autocomplete="off">
+      <div id="counter">
+        <span class="counter-10km">10 km : 0</span><span> • </span>
+        <span class="counter-20km">20 km : 0</span><span> • </span>
+        <span>Total : 0</span>
+      </div>
+    </div>
+    <div class="table-container">
+      <table id="data-table">
+        <thead>
+          <tr>
+            <th data-column="dossard" class="text-center" scope="col" aria-sort="none"><span class="header-label">Dossard</span><span class="sort-indicator"></span></th>
+            <th data-column="nom" scope="col" aria-sort="none"><span class="header-label">Nom</span><span class="sort-indicator"></span></th>
+            <th data-column="prenom" scope="col" aria-sort="none"><span class="header-label">Prénom</span><span class="sort-indicator"></span></th>
+            <th data-column="club" scope="col" aria-sort="none"><span class="header-label">Club</span><span class="sort-indicator"></span></th>
+            <th data-column="genre" class="text-center" scope="col" aria-sort="none"><span class="header-label">Genre</span><span class="sort-indicator"></span></th>
+            <th data-column="categorie" class="text-center" scope="col" aria-sort="none"><span class="header-label">Catégorie</span><span class="sort-indicator"></span></th>
+            <th data-column="course" class="text-center" scope="col" aria-sort="none"><span class="header-label">Course</span><span class="sort-indicator"></span></th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <tr><td colspan="7" class="loading">Chargement des données...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    import { getDatabase, ref, onValue, off } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+    
+    const firebaseConfig = {
+      apiKey: "AIzaSyAIAAz51gEGKQd0EoqA3yUhvnqw3DkQiIo",
+      authDomain: "calor-run.firebaseapp.com",
+      databaseURL: "https://calor-run-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "calor-run",
+      storageBucket: "calor-run.firebasestorage.app",
+      messagingSenderId: "329949291334",
+      appId: "1:329949291334:web:c71ef20268c609cf953b47",
+      measurementId: "G-YVQPW6JGPK"
+    };
+    
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const dbRef = ref(db, "participants");
+    
+    const AppState = {
+      allData: [], filteredData: [],
+      currentSort: { column: 'dossard', direction: 'asc' },
+      isLoading: true
+    };
+    
+    const elements = {
+      tbody: document.getElementById("table-body"),
+      searchInput: document.getElementById("search"),
+      counter: document.getElementById("counter"),
+      headers: document.querySelectorAll("th[data-column]")
+    };
+    
+    const utils = {
+      debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+          clearTimeout(timeout);
+          timeout = setTimeout(() => func(...args), wait);
+        };
+      },
+      normalizeString(str) {
+        return str.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      }
+    };
+    
+    function renderTable() {
+      if (AppState.isLoading) return;
+      if (AppState.filteredData.length === 0) {
+        elements.tbody.innerHTML = `
+          <tr><td colspan="7" class="no-results">
+            ${AppState.allData.length === 0 ? 'Aucune donnée disponible' : 'Aucun résultat trouvé'}
+          </td></tr>`;
+        updateCounter(); return;
+      }
+      const fragment = document.createDocumentFragment();
+      AppState.filteredData.forEach(p => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td class="text-center">${p.dossard}</td>
+          <td>${p.nom}</td>
+          <td>${p.prenom}</td>
+          <td>${p.club || '-'}</td>
+          <td class="text-center">${p.genre}</td>
+          <td class="text-center">${p.categorie}</td>
+          <td class="text-center">${p.course} km</td>`;
+        fragment.appendChild(row);
+      });
+      elements.tbody.innerHTML = '';
+      elements.tbody.appendChild(fragment);
+      updateCounter();
+    }
+    
+    function updateCounter() {
+      const km10 = AppState.filteredData.filter(p => p.course == "10").length;
+      const km20 = AppState.filteredData.filter(p => p.course == "20").length;
+      const total = AppState.filteredData.length;
+      elements.counter.innerHTML = `
+        <span class="counter-10km">10 km : ${km10}</span><span> • </span>
+        <span class="counter-20km">20 km : ${km20}</span><span> • </span>
+        <span>Total : ${total}</span>`;
+    }
+    
+    function updateSortIndicators() {
+      elements.headers.forEach(h => {
+        h.classList.remove('sorted','asc','desc');
+        h.setAttribute('aria-sort','none');
+        if (h.dataset.column === AppState.currentSort.column) {
+          h.classList.add('sorted', AppState.currentSort.direction);
+          h.setAttribute('aria-sort', AppState.currentSort.direction === 'asc' ? 'ascending':'descending');
+        }
+      });
+    }
+    
+    function sortData(column, direction=null) {
+      if (!direction) {
+        direction = AppState.currentSort.column === column && AppState.currentSort.direction === 'asc' ? 'desc':'asc';
+      }
+      AppState.currentSort = { column, direction };
+      AppState.filteredData.sort((a,b) => {
+        let A = a[column], B = b[column];
+        if (!isNaN(A) && !isNaN(B)) { A=Number(A); B=Number(B); }
+        else { A=utils.normalizeString(A); B=utils.normalizeString(B); }
+        if (A<B) return direction==='asc'?-1:1;
+        if (A>B) return direction==='asc'?1:-1;
+        return 0;
+      });
+      updateSortIndicators(); renderTable();
+    }
+    
+    function filterData(searchTerm) {
+      const raw = searchTerm || "";
+      const norm = utils.normalizeString(raw);
+      
+      if (!norm) {
+        AppState.filteredData = [...AppState.allData];
+        sortData(AppState.currentSort.column, AppState.currentSort.direction);
+        return;
+      }
+      
+      // --- Extraire genre+cat (ex: "hm0", "fse") ---
+      const gcMatch = norm.match(/\b([hf])([a-z0-9]+)\b/);
+      const genreFilter = gcMatch ? gcMatch[1].toUpperCase() : null;
+      const catFilter = gcMatch ? gcMatch[2].toUpperCase() : null;
+      
+      // --- Extraire course ONLY si "km" présent (ex: "10 km" ou "10km") ---
+      const courseMatch = norm.match(/\b(\d+)\s*km\b/);
+      const courseFilter = courseMatch ? courseMatch[1] : null;
+      
+      // --- Supprimer les parties reconnues pour ne garder que les mots libres ---
+      let remaining = norm;
+      if (courseMatch) remaining = remaining.replace(/\b(\d+)\s*km\b/, " ");
+      if (gcMatch) remaining = remaining.replace(/\b([hf])([a-z0-9]+)\b/, " ");
+      
+      // --- Mots libres (on ignore les tokens purement numériques pour éviter "10" tout seul) ---
+      const textTerms = remaining
+        .split(/\s+/)
+        .map(t => t.trim())
+        .filter(Boolean);
+        
+      AppState.filteredData = AppState.allData.filter(p => {
+        // genre/catégorie
+        if (genreFilter) {
+          if ((p.genre || "").toUpperCase() !== genreFilter) return false;
+          if (catFilter && (p.categorie || "").toUpperCase() !== catFilter) return false;
+        }
+        
+        // course (strict : doit être "10 km" avec "km")
+        if (courseFilter) {
+          if (String(p.course) !== courseFilter) return false;
+        }
+        
+        // mots libres : chaque mot doit être trouvé dans au moins un champ
+        for (const term of textTerms) {
+          const found = Object.entries(p).some(([k, v]) => {
+            if (v === null || v === undefined) return false;
+            if (k === "course") {
+              const courseWithKm = `${v} km`;
+              return utils.normalizeString(courseWithKm).includes(term) ||
+                     utils.normalizeString(String(v)).includes(term);
+            }
+            return utils.normalizeString(String(v)).includes(term);
+          });
+          if (!found) return false;
+        }
+        
+        return true;
+      });
+      
+      sortData(AppState.currentSort.column, AppState.currentSort.direction);
+    }
+    
+    const debouncedFilter = utils.debounce(searchTerm => filterData(searchTerm), 300);
+    elements.searchInput.addEventListener("input", e => debouncedFilter(e.target.value));
+    elements.headers.forEach(h => h.addEventListener("click", () => sortData(h.dataset.column)));
+
+    function initializeData() {
+      onValue(dbRef, snapshot => {
+        const data = snapshot.val();
+        if (data) {
+          AppState.allData = Object.values(data).map(p=>({
+            dossard:p.dossard||'', nom:p.nom||'', prenom:p.prenom||'',
+            club:p.club||'', genre:p.genre||'', categorie:p.categorie||'',
+            course:p.course||''
+          }));
+          AppState.filteredData=[...AppState.allData]; AppState.isLoading=false;
+          sortData('dossard','asc');
+        } else {
+          AppState.allData=[]; AppState.filteredData=[]; AppState.isLoading=false; renderTable();
+        }
+      }, err => {
+        console.error("Erreur lors du chargement:", err);
+        AppState.isLoading=false;
+        elements.tbody.innerHTML=`<tr><td colspan="7" class="no-results">Erreur lors du chargement des données</td></tr>`;
+      });
+      window.addEventListener('beforeunload', ()=>off(dbRef));
+    }
+
+    initializeData();
+  </script>
+</body>
+</html>

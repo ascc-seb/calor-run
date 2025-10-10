@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Résultats Calor Run</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏅</text></svg>">
+<style>
+:root {
+  --primary-color: #215E99;
+  --secondary-color: #E61780;
+  --bg-white: #fff;
+  --bg-light: #f9f9f9;
+  --shadow: rgba(0,0,0,0.15);
+  --border-radius: 0.5rem;
+  --max-width: 62.5rem;
+  --text-dark: #333;
+  --border-light: #ddd;
+  --header-bg: #e0e0e0;
+}
+* { box-sizing: border-box; margin:0; padding:0; }
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+  color: var(--text-dark);
+  min-height: 100vh;
+  padding: 1.25rem;
+  position: relative;
+}
+body::before {
+  content:''; position: fixed; inset:0;
+  background: linear-gradient(0.25turn, var(--primary-color), var(--secondary-color));
+  opacity:0.3;
+  z-index:-1;
+  pointer-events: none;
+}
+.container { max-width: var(--max-width); margin:0 auto; }
+.header {
+  text-align:center;
+  margin-bottom:0.625rem;
+  color: var(--primary-color);
+  font-size:1.3rem;
+  font-weight:bold;
+  padding:1.25rem 1.25rem 3.75rem;
+  background:url('calor.png') center/contain no-repeat;
+}
+.search-counter-container {
+  display:flex;
+  flex-wrap: nowrap;
+  justify-content: space-between;
+  align-items:center;
+  gap:0.625rem;
+  margin-bottom:1.25rem;
+}
+#search {
+  flex:1;
+  max-width:none;
+  padding:0.5rem 0.75rem;
+  border:none;
+  border-bottom:1px solid #888;
+  background:transparent;
+  color: var(--text-dark);
+  font-size:1rem;
+  outline:none;
+  transition:border-color 0.3s;
+}
+#search:focus { border-bottom-color: var(--primary-color); }
+#counter {
+  font-weight: normal;
+  color: #000;
+  white-space: nowrap;
+}
+#counter a {
+  text-decoration: none;
+  margin: 0 0.25rem;
+  font-weight: normal;
+  color: #000;
+}
+#counter a[href*="distance=10"] { color: var(--primary-color); }
+#counter a[href*="distance=20"] { color: var(--secondary-color); }
+#counter a.active { text-decoration: underline; }
+.table-container {
+  max-width: var(--max-width);
+  overflow-x:auto;
+  margin:0 auto 1.25rem;
+  background: var(--bg-white);
+  border-radius: var(--border-radius); /* remplacé */
+  box-shadow: 0 0.25rem 0.75rem var(--shadow);
+}
+table { width:100%; border-collapse: collapse; min-width:43.75rem; }
+th, td { padding:0.375rem 0.5rem; border-bottom:1px solid var(--border-light); text-align:left; white-space: nowrap; }
+th { background: var(--header-bg); font-weight:600; position:sticky; top:0; z-index:10; }
+tbody tr:nth-child(even){ background: var(--bg-light); }
+.text-center { text-align:center; }
+.loading { text-align:center; padding:1.25rem 0; font-size:1rem; }
+.hidden { display:none; }
+@media(max-width:768px){
+  .header { margin-bottom:0.625rem; padding:0rem 0rem 1.5rem; font-size:1rem; }
+  .search-counter-container { justify-content:center; flex-direction:column; gap:0.625rem; margin-bottom:0.625rem; }
+  #search, #counter { font-size:0.75rem; text-align: center; width: 100%; padding:0rem; max-width: none; flex: none; }
+  table { font-size:0.85rem; }
+  th, td { padding:0.375rem 0.5rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header" id="header-title"></div>
+  <div class="search-counter-container">
+    <input type="text" id="search" placeholder="Recherche par Nom, prénom, cat. (ex: HM1)" autocomplete="off" aria-label="Recherche par Nom, prénom ou catégorie">
+    <div id="counter">10 km | 20 km – Arrivées : 0/0</div>
+  </div>
+</div>
+
+<div class="table-container hidden" id="table-container">
+  <table>
+    <thead>
+      <tr>
+        <th class="text-center">Dossard</th>
+        <th>Nom</th>
+        <th>Prénom</th>
+        <th class="text-center">Temps</th>
+        <th class="text-center">Scratch</th>
+        <th class="text-center">Genre</th>
+        <th class="text-center">Pos. Genre</th>
+        <th class="text-center">Cat</th>
+        <th class="text-center">Pos. Cat</th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+      <tr><td colspan="9" class="loading">Connexion en temps réel...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script>
+// === Configuration Firebase ===
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAIAAz51gEGKQd0EoqA3yUhvnqw3DkQiIo",
+  authDomain: "calor-run.firebaseapp.com",
+  databaseURL: "https://calor-run-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "calor-run",
+  storageBucket: "calor-run.appspot.com",
+  messagingSenderId: "329949291334",
+  appId: "1:329949291334:web:c71ef20268c609cf953b47",
+  measurementId: "G-YVQPW6JGPK"
+};
+firebase.initializeApp(FIREBASE_CONFIG);
+
+// === Détection distance depuis URL ===
+const urlParams = new URLSearchParams(window.location.search);
+let COURSE_DISTANCE = parseInt(urlParams.get('distance'), 10) || 10;
+document.title = `Résultats ${COURSE_DISTANCE} km Calor Run`;
+document.getElementById('header-title').textContent = `RÉSULTATS ${COURSE_DISTANCE} KM`;
+
+// === Références Firebase ===
+const db = {
+  depart: firebase.database().ref('data/depart_course'),
+  participants: firebase.database().ref('participants'),
+  scans: firebase.database().ref('scan_dossards')
+};
+
+// === Sélecteurs DOM ===
+const el = {
+  tbody: document.getElementById('tbody'),
+  table: document.getElementById('table-container'),
+  search: document.getElementById('search'),
+  counter: document.getElementById('counter')
+};
+
+let participants = {}, scans = {}, departure = null;
+const tableRows = new Map();
+
+// === Formatage du temps ===
+const formatTime = ms => {
+  const s = Math.floor(ms/1000);
+  const h = Math.floor(s/3600);
+  const m = Math.floor((s%3600)/60);
+  const sec = s%60;
+  return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+};
+
+// === Rendu du tableau ===
+const render = () => {
+  if (!departure) return;
+
+  let data = Object.entries(scans).map(([id, scan]) => {
+    const p = participants[id];
+    if(!p || p.course!==COURSE_DISTANCE) return null;
+    const t = new Date(scan.dateTime).getTime()-departure;
+    return {...p, tempsMs:t, tempsStr:formatTime(t)};
+  }).filter(Boolean);
+
+  const total = Object.values(participants).filter(p=>p.course===COURSE_DISTANCE).length;
+  el.counter.innerHTML = `
+    <a href="?distance=10">10 km</a> | 
+    <a href="?distance=20">20 km</a> – Arrivées : ${data.length}/${total}
+  `;
+
+  const activeLink = el.counter.querySelector('a[href="?distance=' + COURSE_DISTANCE + '"]');
+  if (activeLink) activeLink.classList.add("active");
+
+  data.sort((a,b)=>a.tempsMs-b.tempsMs);
+
+  const classementGenre = {};
+  const classementCat = {};
+  data.forEach((p,i)=>{
+    p.scratch = i+1;
+    classementGenre[p.genre] = (classementGenre[p.genre]||0)+1;
+    p.posGenre = classementGenre[p.genre];
+    const catKey = `${p.genre}_${p.categorie}`;
+    classementCat[catKey] = (classementCat[catKey]||0)+1;
+    p.posCat = classementCat[catKey];
+  });
+
+  tableRows.clear();
+  const frag = document.createDocumentFragment();
+  data.forEach(p=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="text-center">${p.dossard}</td>
+      <td>${p.nom}</td>
+      <td>${p.prenom}</td>
+      <td class="text-center">${p.tempsStr}</td>
+      <td class="text-center">${p.scratch}</td>
+      <td class="text-center">${p.genre||''}</td>
+      <td class="text-center">${p.posGenre}</td>
+      <td class="text-center">${p.categorie||''}</td>
+      <td class="text-center">${p.posCat}</td>
+    `;
+    frag.appendChild(tr);
+    tableRows.set(tr,tr);
+  });
+  el.tbody.innerHTML='';
+  el.tbody.appendChild(frag);
+  el.table.classList.remove('hidden');
+};
+
+// === Recherche avec debounce ===
+let searchTimeout;
+el.search.addEventListener('input', e => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    const term = e.target.value.toLowerCase().trim();
+    let genreFilter = '', catFilter = '', nameFilter = term;
+
+    if (/^(h|f)([a-z0-9]+)$/i.test(term)) {
+      const match = term.match(/^(h|f)([a-z0-9]+)$/i);
+      genreFilter = match[1].toUpperCase();
+      catFilter = match[2].toUpperCase();
+      nameFilter = '';
+    }
+
+    tableRows.forEach(tr => {
+      if (!tr.dataset.cachedText) tr.dataset.cachedText = tr.textContent.toLowerCase();
+      const text = tr.dataset.cachedText;
+      const pGenre = tr.children[5].textContent.toUpperCase();
+      const pCat = tr.children[7].textContent.toUpperCase();
+      let show = true;
+      if (genreFilter) show = pGenre === genreFilter;
+      if (show && catFilter) show = pCat === catFilter;
+      if (show && nameFilter) show = text.includes(nameFilter);
+      tr.style.display = show ? '' : 'none';
+    });
+  }, 200);
+});
+
+// === Firebase Listeners sécurisés ===
+const safeListener = (ref, callback) => {
+  ref.on('value', snapshot=>{
+    try{ callback(snapshot); } catch(err){ console.error('Erreur Firebase :', err); }
+  });
+};
+safeListener(db.depart, snap => { departure = snap.exists()?new Date(snap.val()).getTime():null; render(); });
+safeListener(db.participants, snap => { participants = snap.val()||{}; render(); });
+safeListener(db.scans, snap => { scans = snap.val()||{}; render(); });
+</script>
+</body>
+</html>
