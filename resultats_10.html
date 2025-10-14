@@ -72,7 +72,6 @@ body::before {
 }
 #counter a {
   text-decoration: none;
-  margin: 0 0.25rem;
   font-weight: normal;
   color: #000;
 }
@@ -111,7 +110,7 @@ tbody tr:nth-child(even){ background: var(--bg-light); }
   <div class="header">RÉSULTATS 10 KM</div>
   <div class="search-counter-container">
     <input type="text" id="search" placeholder="Recherche par Nom, prénom, cat. (ex: HM1)" autocomplete="off" aria-label="Recherche par Nom, prénom ou catégorie">
-    <div id="counter"><a href="#" class="active">10 km</a> | <a href="resultats_20.html">20 km</a> – Arrivées : 0/0</div>
+    <div id="counter"><a href="#" class="active">10 km</a> • <a href="resultats_20.html">20 km</a> • Arrivées : 0/0</div>
   </div>
 </div>
 
@@ -188,7 +187,7 @@ const render = () => {
   }).filter(Boolean);
 
   const total = Object.values(participants).filter(p=>p.course===COURSE_DISTANCE).length;
-  el.counter.innerHTML = `<a href="#" class="active">10 km</a> | <a href="resultats_20.html">20 km</a> – Arrivées : ${data.length}/${total}`;
+  el.counter.innerHTML = `<a href="#" class="active">10 km</a> • <a href="resultats_20.html">20 km</a> • Arrivées : ${data.length}/${total}`;
 
   data.sort((a,b)=>a.tempsMs-b.tempsMs);
 
