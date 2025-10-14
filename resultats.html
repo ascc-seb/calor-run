@@ -42,7 +42,7 @@ body::before {
   font-size:1.3rem;
   font-weight:bold;
   padding:1.25rem 1.25rem 3.75rem;
-  background:url('calor.png') center/contain no-repeat;
+  background:url('https://raw.githubusercontent.com/ascc-seb/calor-run/ce48f597af0dee88f02a45f9347e7796f1ab1e0f/calor.png') center/contain no-repeat;
 }
 .search-counter-container {
   display:flex;
@@ -117,11 +117,11 @@ tbody tr:nth-child(even){ background: var(--bg-light); }
   <table>
     <thead>
       <tr>
+        <th class="text-center">Scratch</th>
         <th class="text-center">Dossard</th>
         <th>Nom</th>
         <th>Prénom</th>
         <th class="text-center">Temps</th>
-        <th class="text-center">Scratch</th>
         <th class="text-center">Genre</th>
         <th class="text-center">Pos. Genre</th>
         <th class="text-center">Cat</th>
@@ -129,7 +129,7 @@ tbody tr:nth-child(even){ background: var(--bg-light); }
       </tr>
     </thead>
     <tbody id="tbody">
-      <tr><td colspan="9" class="loading">Connexion en temps réel...</td></tr>
+      <tr><td colspan="9" class="loading">Connexion...</td></tr>
     </tbody>
   </table>
 </div>
@@ -137,7 +137,7 @@ tbody tr:nth-child(even){ background: var(--bg-light); }
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <script>
-// === Configuration Firebase ===
+
 const FIREBASE_CONFIG = {
     apiKey: "AIzaSyAIAAz51gEGKQd0EoqA3yUhvnqw3DkQiIo",
     authDomain: "calor-run.firebaseapp.com",
@@ -156,14 +156,12 @@ let COURSE_DISTANCE = parseInt(urlParams.get('distance'), 10) || 10;
 document.title = `Résultats ${COURSE_DISTANCE} km Calor Run`;
 document.getElementById('header-title').textContent = `RÉSULTATS ${COURSE_DISTANCE} KM`;
 
-// === Références Firebase ===
 const db = {
   depart: firebase.database().ref('data/depart_course'),
   participants: firebase.database().ref('participants'),
   scans: firebase.database().ref('scan_dossards')
 };
 
-// === Sélecteurs DOM ===
 const el = {
   tbody: document.getElementById('tbody'),
   table: document.getElementById('table-container'),
