@@ -76,10 +76,8 @@ tbody tr:nth-child(even){ background: var(--bg-light); }
     margin:0 0.5rem;
     font-size:1rem;
     cursor:pointer;
-    text-decoration:none;
-    color: var(--primary-color);
 }
-.filter-bar a.active { font-weight:bold; }
+.filter-bar a.active { text-decoration: underline; }
 .filter-bar select {
     margin-left:1rem;
     padding:0.25rem 0.5rem;
@@ -101,8 +99,8 @@ tbody tr:nth-child(even){ background: var(--bg-light); }
 <div class="container">
     <div class="header">PODIUMS CALOR RUN</div>
     <div class="filter-bar hidden" id="filter-bar">
-        <a data-course="10km" class="filter-course">10 km</a> |
-        <a data-course="20km" class="filter-course">20 km</a>
+        <a data-course="10km" class="filter-course" style="color:var(--primary-color)">10 km</a> |
+        <a data-course="20km" class="filter-course" style="color:var(--secondary-color)">20 km</a>
         <select id="filter-cat">
             <option value="">Toutes catégories</option>
         </select>
