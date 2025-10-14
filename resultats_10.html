@@ -151,7 +151,7 @@ const FIREBASE_CONFIG = {
 };
 firebase.initializeApp(FIREBASE_CONFIG);
 
-const COURSE_DISTANCE = 10; // ✅ forcé à 10 km
+const COURSE_DISTANCE = 10;
 
 const db = {
   depart: firebase.database().ref('data/depart_course'),
@@ -227,7 +227,6 @@ const render = () => {
   el.table.classList.remove('hidden');
 };
 
-// === Recherche ===
 let searchTimeout;
 el.search.addEventListener('input', e => {
   clearTimeout(searchTimeout);
