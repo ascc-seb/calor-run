@@ -185,7 +185,7 @@ const render = () => {
   }).filter(Boolean);
 
   const total = Object.values(participants).filter(p=>p.course===COURSE_DISTANCE).length;
-  el.counter.innerHTML = `<a href="resultats_20.html">10 km</a> | <a href="#" class="active">20 km</a> – Arrivées : ${data.length}/${total}`;
+  el.counter.innerHTML = `<a href="#" class="active">10 km</a> | <a href="resultats_20.html">20 km</a> – Arrivées : ${data.length}/${total}`;
 
   data.sort((a,b)=>a.tempsMs-b.tempsMs);
 
