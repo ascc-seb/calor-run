@@ -219,11 +219,11 @@ const render = () => {
   data.forEach(p=>{
     const tr = document.createElement('tr');
     tr.innerHTML = `
+      <td class="text-center">${p.scratch}</td>
       <td class="text-center">${p.dossard}</td>
       <td>${p.nom}</td>
       <td>${p.prenom}</td>
       <td class="text-center">${p.tempsStr}</td>
-      <td class="text-center">${p.scratch}</td>
       <td class="text-center">${p.genre||''}</td>
       <td class="text-center">${p.posGenre}</td>
       <td class="text-center">${p.categorie||''}</td>
