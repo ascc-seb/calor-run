@@ -110,7 +110,7 @@ tbody tr:nth-child(even){ background: var(--bg-light); }
   <div class="header" id="header-title"></div>
   <div class="search-counter-container">
     <input type="text" id="search" placeholder="Recherche par Nom, prénom, cat. (ex: HM1)" autocomplete="off" aria-label="Recherche par Nom, prénom ou catégorie">
-    <div id="counter">10 km | 20 km – Arrivées : 0/0</div>
+    <div id="counter">10 km • 20 km • Arrivées : 0/0</div>
   </div>
 </div>
 
@@ -194,9 +194,7 @@ const render = () => {
   }).filter(Boolean);
 
   const total = Object.values(participants).filter(p=>p.course===COURSE_DISTANCE).length;
-  el.counter.innerHTML = `
-    <a href="?distance=10">10 km</a> | 
-    <a href="?distance=20">20 km</a> – Arrivées : ${data.length}/${total}
+  el.counter.innerHTML = `<a href="?distance=10">10 km</a> • <a href="?distance=20">20 km</a> • Arrivées : ${data.length}/${total}
   `;
 
   const activeLink = el.counter.querySelector('a[href="?distance=' + COURSE_DISTANCE + '"]');
