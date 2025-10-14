@@ -152,9 +152,17 @@ firebase.initializeApp(FIREBASE_CONFIG);
 
 // === Détection distance depuis URL ===
 const urlParams = new URLSearchParams(window.location.search);
-let COURSE_DISTANCE = parseInt(urlParams.get('distance'), 10) || 10;
-document.title = `Résultats ${COURSE_DISTANCE} km Calor Run`;
-document.getElementById('header-title').textContent = `RÉSULTATS ${COURSE_DISTANCE} KM`;
+const distanceParam = urlParams.get('distance');
+let COURSE_DISTANCE = null;
+
+if (distanceParam === '10' || distanceParam === '20') {
+  COURSE_DISTANCE = parseInt(distanceParam, 10);
+  document.title = `Résultats ${COURSE_DISTANCE} km Calor Run`;
+  document.getElementById('header-title').textContent = `RÉSULTATS ${COURSE_DISTANCE} KM`;
+} else {
+  document.title = "Résultats Calor Run";
+  document.getElementById('header-title').textContent = "RÉSULTATS CALOR RUN";
+}
 
 const db = {
   depart: firebase.database().ref('data/depart_course'),
@@ -187,16 +195,18 @@ const render = () => {
 
   let data = Object.entries(scans).map(([id, scan]) => {
     const p = participants[id];
-    if(!p || p.course!==COURSE_DISTANCE) return null;
+    if(!p || (COURSE_DISTANCE && p.course!==COURSE_DISTANCE)) return null;
     const t = new Date(scan.dateTime).getTime()-departure;
     return {...p, tempsMs:t, tempsStr:formatTime(t)};
   }).filter(Boolean);
 
-  const total = Object.values(participants).filter(p=>p.course===COURSE_DISTANCE).length;
+  const total = COURSE_DISTANCE 
+    ? Object.values(participants).filter(p=>p.course===COURSE_DISTANCE).length 
+    : Object.values(participants).length;
   el.counter.innerHTML = `<a href="?distance=10">10 km</a> • <a href="?distance=20">20 km</a> • Arrivées : ${data.length}/${total}`;
 
   const activeLink = el.counter.querySelector('a[href="?distance=' + COURSE_DISTANCE + '"]');
-  if (activeLink) activeLink.classList.add("active");
+  if (activeLink && COURSE_DISTANCE) activeLink.classList.add("active");
 
   data.sort((a,b)=>a.tempsMs-b.tempsMs);
 
