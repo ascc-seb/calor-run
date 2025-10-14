@@ -72,7 +72,6 @@ body::before {
 }
 #counter a {
   text-decoration: none;
-  margin: 0 0.25rem;
   font-weight: normal;
   color: #000;
 }
@@ -84,7 +83,7 @@ body::before {
   overflow-x:auto;
   margin:0 auto 1.25rem;
   background: var(--bg-white);
-  border-radius: var(--border-radius); /* remplacé */
+  border-radius: var(--border-radius);
   box-shadow: 0 0.25rem 0.75rem var(--shadow);
 }
 table { width:100%; border-collapse: collapse; min-width:43.75rem; }
@@ -194,8 +193,7 @@ const render = () => {
   }).filter(Boolean);
 
   const total = Object.values(participants).filter(p=>p.course===COURSE_DISTANCE).length;
-  el.counter.innerHTML = `<a href="?distance=10">10 km</a> • <a href="?distance=20">20 km</a> • Arrivées : ${data.length}/${total}
-  `;
+  el.counter.innerHTML = `<a href="?distance=10">10 km</a> • <a href="?distance=20">20 km</a> • Arrivées : ${data.length}/${total}`;
 
   const activeLink = el.counter.querySelector('a[href="?distance=' + COURSE_DISTANCE + '"]');
   if (activeLink) activeLink.classList.add("active");
