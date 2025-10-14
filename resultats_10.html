@@ -92,6 +92,7 @@ tbody tr:nth-child(even){ background: var(--bg-light); }
 .text-center { text-align:center; }
 .loading { text-align:center; padding:1.25rem 0; font-size:1rem; }
 .hidden { display:none; }
+
 @media(max-width:768px){
   .header { margin-bottom:0.625rem; padding:0rem 0rem 1.5rem; font-size:1rem; }
   .search-counter-container { justify-content:center; flex-direction:column; gap:0.625rem; margin-bottom:0.625rem; }
@@ -184,7 +185,7 @@ const render = () => {
   }).filter(Boolean);
 
   const total = Object.values(participants).filter(p=>p.course===COURSE_DISTANCE).length;
-  el.counter.innerHTML = `<a href="#" class="active">10 km</a> | <a href="resultats_20.html">20 km</a> – Arrivées : ${data.length}/${total}`;
+  el.counter.innerHTML = `<a href="resultats_20.html">10 km</a> | <a href="#" class="active">20 km</a> – Arrivées : ${data.length}/${total}`;
 
   data.sort((a,b)=>a.tempsMs-b.tempsMs);
 
