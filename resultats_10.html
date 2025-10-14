@@ -76,7 +76,9 @@ body::before {
   font-weight: normal;
   color: #000;
 }
-#counter a.active { color: var(--primary-color); text-decoration: underline; }
+#counter a[href*="distance=10"] { color: var(--primary-color); }
+#counter a[href*="distance=20"] { color: var(--secondary-color); }
+#counter a.active { text-decoration: underline; }
 .table-container {
   max-width: var(--max-width);
   overflow-x:auto;
