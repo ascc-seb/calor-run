@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ECG + Multi-path avec fade</title>
+  <style>
+    body {
+      background: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    svg {
+      width: 90%;
+      height: auto;
+      overflow: visible;
+    }
+
+    .ecg {
+      fill: none;
+      stroke: #e61780;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 2px;
+    }
+
+    .pulse {
+      fill: #00ff00;
+      filter: url(#glow);
+    }
+
+    .halo {
+      fill: rgba(0, 255, 0, 0.3);
+      filter: blur(8px);
+    }
+
+    .trail {
+      fill: none;
+      stroke: #00ff00;
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0.6;
+      filter: blur(4px);
+      transition: opacity 0.3s ease;
+    }
+
+    .coureur { fill: #204b9b; }
+    .bras { fill:#FFFFFF; }
+    .coeur_gauche { fill: #f0047f; }
+    .coeur_droit { fill: url(#radial-gradient); }
+  </style>
+</head>
+<body>
+  <svg id="animSVG" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1922 250">
+    <defs>
+      <radialGradient id="radial-gradient" cx="702.67" cy="-70.04" r="148.32"
+                      gradientTransform="translate(-244.84 82.56)" gradientUnits="userSpaceOnUse">
+        <stop offset=".05" stop-color="#fbb4d9"/>
+        <stop offset=".07" stop-color="#faa5d1"/>
+        <stop offset=".17" stop-color="#f560ae"/>
+        <stop offset=".26" stop-color="#f22e94"/>
+        <stop offset=".33" stop-color="#f00f84"/>
+        <stop offset=".36" stop-color="#f0047f"/>
+        <stop offset="1" stop-color="#f0047f"/>
+      </radialGradient>
+
+      <filter id="glow">
+        <feGaussianBlur stdDeviation="6.5" result="coloredBlur"/>
+        <feMerge>
+          <feMergeNode in="coloredBlur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+    </defs>
+
+    <!-- ECG -->
+<polyline id="ecg_left" class="ecg"
+points="1,168 36,167 42,158 50,168 62,169 67,195 74,112 80,184 88,169 105,167 115,151 127,168 157,168 165,158 173,168 184,169 190,204 198,122 205,194 213,168 220,167 232,149 245,168 276,167 283,158 291,168 302,169 308,195 314,112 320,184 329,168 343,167 355,151 367,168 395,168"/>
+<polyline id="ecg_right" class="ecg"
+points="443,168 476,167 482,158 490,168 501,169 506,195 513,112 519,184 528,168 543,168 555,151 567,168 596,167 604,158 613,168 623,168 629,204 637,122 644,194 651,169 659,168 671,150 683,168 714,168 721,158 730,168 741,169 747,195 754,112 760,184 768,168 770,168 785,167 796,151 807,168 836,168 844,158 853,168 864,169 870,204 877,122 884,194 892,168 900,168 912,150 925,168 954,168 961,158 970,168 982,169 987,195 994,112 1000,184 1008,168 1023,168 1036,151 1047,168 1076,168 1086,158 1092,167 1093,168 1104,169 1109,204 1117,122 1124,194 1132,168 1140,168 1152,149 1163,167 1165,168 1194,168 1202,158 1209,168 1211,168 1220,168 1222,169 1227,195 1234,112 1240,184 1248,168 1250,168 1263,168 1275,151 1285,167 1287,168 1317,168 1324,158 1332,168 1343,168 1345,168 1350,204 1357,122 1364,194 1372,168 1380,168 1382,167 1392,149 1403,167 1406,168 1435,168 1442,158 1449,167 1451,168 1461,168 1462,169 1467,195 1474,112 1480,184 1489,168 1491,168 1504,168 1515,151 1526,167 1528,168 1557,168 1564,158 1572,168 1574,168 1584,168 1585,169 1590,204 1598,122 1605,194 1612,168 1614,168 1620,168 1623,167 1632,149 1644,167 1646,168 1675,168 1682,158 1689,167 1691,168 1701,168 1703,169 1708,195 1715,112 1721,184 1729,168 1731,168 1744,168 1746,167 1755,151 1766,167 1768,168 1797,167 1799,167 1805,158 1807,158 1812,167 1814,167 1824,168 1825,169 1830,204 1838,122 1845,194 1853,168 1861,167 1863,166 1873,149 1884,167 1886,167 1921,168"/>
+
+    <!-- Paths -->
+<path id="coeur_gauche" class="coeur_gauche"
+d="M385.68,23.66c-3.71-1.49-11.48-4.06-20.71-3.98c-25.81,0.2-48.19,21.71-47.97,50.05c0.33,41.97,41.13,75.56,87.49,83.81c0.52,0.09,1.02-0.24,1.16-0.73c0.14-0.48-0.1-0.98-0.57-1.2c-0.54-0.25-53.47-28.41-53.88-80.33c-0.23-29.5,16.78-44.5,36.31-44.65c0.49,0,0.92-0.32,1.04-0.77c0.12-0.45-0.1-0.93-0.53-1.15C387.97,24.67,387.14,24.25,385.68,23.66z"/>
+<path id="coeur_droit" class="coeur_droit"
+d="M385.7,17.69c0.25,0.41,0.74,0.61,1.2,0.47c36.36-10.22,61.7,12.47,61.64,52.49c-0.07,49.73-41.9,98.94-42.4,99.43c-0.38,0.37-0.43,0.97-0.12,1.41c0.31,0.43,0.91,0.6,1.37,0.32c45.92-28.72,74.79-71.95,74.79-113.9c0-35.75-24.23-58.01-55.79-57.91c-24.33,0.08-40.34,16.16-40.54,16.39C385.5,16.74,385.45,17.27,385.7,17.69z"/>
+<path id="coureur" class="coureur"
+d="M333.16,161.44c-0.51-0.04-0.81-0.43-1-1.21c-0.29-1.25-0.44-2.51-0.52-3.79c-0.3-7.13,2.93-13.75,4.68-20.54c0.48-0.96,0.43-2.32,1.88-2.19c2.81-0.53,5.35,1.05,7.67,2.52c1.43,0.95,10.91,0.74,12.05-0.41c2.8,0.36,4.91-1.16,7.6-1.62c3-0.42,5.91-0.14,8.84,0.31c2.17,0.34,4.26,1.06,6.31,1.82c1.23,0.45,1.9,0.2,2.26-1.03c1.1-0.65,1.46-1.82,1.67-2.9c1.42-5.98,2.79-11.94,4.79-17.71c0.91-4.74-1.97-9.21-0.79-13.96c0.77-3.78,3.82-6.83,2.71-10.91c-0.57-2.31-1.78-4.48-1.72-6.94c0.01-0.43-0.19-0.5-0.56-0.62c-1.06-0.34-2.11-0.33-3.14-0.04c-2.12,0.59-4.32,0.72-6.47,1.03c-2.13,0.31-4.27-0.52-6.45-0.52c-2.23-0.56-2.82-4.45-1.6-6.35c2.97-6.36,7.41-11.71,11.2-17.57c0.9-1.62,2.21-2.85,3.76-3.84c2.89-1.84,5.56-4,8.22-6.15c0.8-0.51,2.02-0.68,2.11-1.83c0.13-1.63,0.39-3.3-0.65-4.82c-2.34-3.65-5.87-7.56-4.02-12.15c1.62-6.27,7.9-7.86,13.64-7.07c3.33,0.49,4.89,3.89,5.9,6.72c0.2,2.37,3.29,3.67,2.7,5.4c-0.71,2.03-0.96,4.11-0.91,6.26c0.03,1.27-0.56,2.49-1.8,2.9c-1.63,0.23-3.88,4.29-1.84,5c4.51,1.68,7.53,3.41,8.21,8.63c0.6,0.95,0.25,14.35,2.09,11.32c0.95-3.54-0.67-6.97,1.75-10.56c0.94-1.72,1.09-1.85,2.71-0.77c1.61,1.07,3.2,2.26,4.41,3.77c3.85,4.28-4.17,9.82-5.14,14.64c-1.85,4.9-5.1,9.52-9.72,12.08c-1.55,0.79-0.31,5.27-1.1,7.12c-0.12,0.51-0.06,1.12,0.11,1.71c0.22,5.04-1.19,4.77,2,9.85c1.12,2.03,2.1,3.99,2.43,6.38c0.4,2.97,1.78,5.71,3.05,8.43c1.99,4.91,4.73,9.4,7.05,14.14c1.04,2.32-0.61,4.91,0,7.35c0.33,3.09,1.18,6.12,1.73,9.17c0.19,0.88-0.15,1.91,0.69,2.61c-0.36,0.41-0.69,0.81-0.07,1.3c0.92,5.61,1.28,11.79,4.9,16.59c2.21,2.66,8.17,3,11.34,2.03c1.84-0.51,3.45-1.94,5.43-1.74c5.01,1.66-5.97,9.54-8.11,10.17c-2.59,1.29-5.21,2.54-7.66,4.09c-1.85,0.89-5.27,3.33-6.7,0.89c-1.31-1.79-1.88-3.83-2.1-6.01c-0.56-5.67-3.21-10.8-5.17-16.07c-1.98-3.53-3.52-7.29-4.66-11.23c-1.03-3.57-0.89-7.31-1.5-10.94c0.43-1.42,0.21-2.98-0.74-4.17c-3.17-3.97-6.62-7.69-10.01-11.48c-0.65-0.73-0.99-0.5-1.36,0.19c-2.71,5.6-7.25,10.24-10.21,15.52c-0.18,0.08-0.45,0.12-0.52,0.26c-1.23,2.3-3.04,3.89-5.48,4.77c-8.2-1.07-16.51-0.77-24.63-2.35c-1.47-0.24-2.97-0.23-4.43-0.63c-4.1-0.94-8.46-0.24-12.42,1.03c-4.24,2.65-8.62,6.23-9.98,11.27c-0.32,1.02-0.61,2.17-1.74,2.66C333.73,161.39,333.42,161.46,333.16,161.44z"/>
+<path id="bras"
+d="M383.17,72.73c0.54,0.16,1.06,0.31,2.56,0.75c-0.19,0.32-0.44,0.94-0.57,0.91c-0.79-0.14-1.54-0.43-2.31-0.68C382.96,73.39,383.06,73.06,383.17,72.73z"/>
+
+    <!-- Animation elements -->
+    <polyline id="ecgTrail" class="trail" points=""/>
+    <circle id="ecgDot" class="pulse" r="4"/>
+    <circle id="ecgHalo" class="halo" r="8"/>
+
+    <polyline id="trail" class="trail" points=""/>
+    <circle id="pulse" class="pulse" r="4"/>
+    <circle id="halo" class="halo" r="8"/>
+  </svg>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const CONFIG = {
+        ecg: { speed: 2, trailLength: 25, sampleStep: 1 },
+        path: { duration: 3000, pauseBetween: 100, trailLength: 12 }
+      };
+
+      const $ = id => document.getElementById(id);
+      const setCirclePosition = (circle, point) => {
+        circle.setAttribute("cx", point.x);
+        circle.setAttribute("cy", point.y);
+      };
+      const updateTrail = (trailElement, points, maxLength) => {
+        if (points.length > maxLength) points.shift();
+        trailElement.setAttribute("points", points.join(" "));
+        trailElement.style.opacity = 0.2 + 0.4 * (points.length / maxLength);
+      };
+      const samplePolylineUniform = (polyline, step = 1) => {
+        const pts = [];
+        const len = polyline.getTotalLength();
+        for (let l = 0; l <= len; l += step) pts.push(polyline.getPointAtLength(l));
+        return pts;
+      };
+
+      // ECG animation
+      function animateECG() {
+        const ecgDot = $("ecgDot"), ecgHalo = $("ecgHalo"), ecgTrail = $("ecgTrail");
+        const left = samplePolylineUniform($("ecg_left"), CONFIG.ecg.sampleStep);
+        const right = samplePolylineUniform($("ecg_right"), CONFIG.ecg.sampleStep);
+        const all = [...left, ...right];
+        const trailPts = [];
+        let i = 0;
+
+        function frame() {
+          const p = all[i];
+          setCirclePosition(ecgDot, p);
+          setCirclePosition(ecgHalo, p);
+          trailPts.push(`${p.x},${p.y}`);
+          updateTrail(ecgTrail, trailPts, CONFIG.ecg.trailLength);
+          i = (i + 1) % all.length;
+          setTimeout(frame, CONFIG.ecg.speed);
+        }
+        frame();
+      }
+
+      // Path animation
+      async function animatePath(path, duration = CONFIG.path.duration) {
+        const pulse = $("pulse"), halo = $("halo"), trail = $("trail");
+        const pts = [];
+        const len = path.getTotalLength();
+        const start = performance.now();
+        return new Promise(resolve => {
+          function frame(t) {
+            const prog = Math.min((t - start) / duration, 1);
+            const p = path.getPointAtLength(prog * len);
+            setCirclePosition(pulse, p);
+            setCirclePosition(halo, p);
+            pts.push(`${p.x},${p.y}`);
+            updateTrail(trail, pts, CONFIG.path.trailLength);
+            if (prog < 1) requestAnimationFrame(frame);
+            else resolve();
+          }
+          requestAnimationFrame(frame);
+        });
+      }
+
+      async function animatePathLoop() {
+        const paths = ["coeur_gauche", "coeur_droit", "coureur"].map($);
+        const trail = $("trail");
+        while (true) {
+          for (const p of paths) {
+            trail.setAttribute("points", "");
+            await animatePath(p);
+            await new Promise(r => setTimeout(r, CONFIG.path.pauseBetween));
+          }
+        }
+      }
+
+      animateECG();
+      animatePathLoop();
+    });
+  </script>
+</body>
+</html>
