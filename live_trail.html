@@ -164,7 +164,7 @@ elements.counterTotal = elements.compteurs.querySelector('.counter-total');
 
 let departureTimestamp = null;
 let participants = {};
-let scans = {};
+let arrivees = {};
 let chronoInterval = null;
 
 const app = firebase.initializeApp(FIREBASE_CONFIG);
@@ -245,9 +245,9 @@ function displayData(classement,count10,count20,total10,total20){
 }
 
 function updateClassement(){
-    if (!departureTimestamp || Object.keys(scans).length === 0) {return;}
-    const classement = Object.keys(scans).map(dossard => {
-        const valeurExcel = Number(scans[dossard]);
+    if (!departureTimestamp || Object.keys(arrivees).length === 0) {return;}
+    const classement = Object.keys(arrivees).map(dossard => {
+        const valeurExcel = Number(arrivees[dossard]);
         const scanTimestamp = Math.round((valeurExcel - 25569) * 86400000);
         const p = participants[String(dossard)] || {};
         const tempsMs = (scanTimestamp - 2 * 60 * 60 * 1000) - departureTimestamp; // Correction -2H00 UTC
@@ -295,7 +295,7 @@ db.ref('participants').on('value', snapshot => {
 });
 
 db.ref('live_scratch').on('value', snapshot => {
-    scans = snapshot.val() || {};
+    arrivees = snapshot.val() || {};
     updateClassement();
 });
 
