@@ -1,61 +1,305 @@
 <!DOCTYPE html>
 <html lang="fr">
-
 <head>
-    <meta charset="UTF-8">
-    <title>Test Firebase</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Calor Run</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⏱️</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root {
+    --primary-color: #215E99;
+    --secondary-color: #E61780;
+    --bg-white: #fff;
+    --bg-light: #f9f9f9;
+    --shadow: rgba(0, 0, 0, 0.15);
+    --border-radius: 0.5rem;
+    --max-width: 62.5rem;
+    --text-dark: #333;
+    --border-light: #ddd;
+    --header-bg: #e0e0e0;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height: 1.5;
+    color: var(--text-dark);
+    min-height: 100vh;
+    padding: 1.25rem;
+    position: relative;
+}
+body::before {
+  content:''; position: fixed; inset:0;
+  background: linear-gradient(0.25turn, var(--primary-color), var(--secondary-color));
+  opacity:0.3;
+  z-index:-1;
+  pointer-events: none;
+}
+.container { max-width: var(--max-width); margin: 0 auto; }
+.header {
+  text-align:center;
+  margin-bottom:0.625rem;
+  color: var(--primary-color);
+  font-size:1.3rem;
+  font-weight:bold;
+  padding:1.25rem 1.25rem 3.75rem;
+  background:url('calor.png') center/contain no-repeat;
+}
+.chrono-time {
+    font-family: 'Share Tech Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    color: var(--primary-color);
+}
+.chrono-time.paused { opacity: 0.7; }
+.counter-line { text-align: center; margin-bottom: 15px; font-size: 1rem; }
+.counter-10km { color: var(--primary-color); }
+.counter-20km { color: var(--secondary-color); }
+.counter-total { color: #000; }
+.counter-error {
+    animation: blinker 2s linear infinite;
+    color: red;
+}
+@keyframes blinker { 50% { opacity: 0; } }
+.table-container {
+    width: 96vw;
+    max-width: 1400px;
+    overflow-x:auto;
+    margin:0 auto 1.25rem;
+    background: var(--bg-white);
+    border-radius: var(--border-radius);
+    box-shadow: 0 0.25rem 0.75rem var(--shadow);
+}
+table { width: 100%; border-collapse: collapse; min-width:43.75rem; }
+th, td { padding:0.375rem 0.5rem; border-bottom:1px solid var(--border-light); text-align:left; white-space: nowrap; }
+th { background: var(--header-bg); font-weight:600; position:sticky; top:0; z-index:10; }
+tbody tr:nth-child(even){ background: var(--bg-light); }
+.text-center { text-align:center; }
+.loading { text-align:center; padding:1.25rem 0; font-size:1rem; }
+.hidden { display:none; }
+
+@media (max-width: 768px) {
+    .header { margin-bottom:0.625rem; padding:0rem 0rem 1.5rem; font-size:0.75rem; }
+    .counter-line { margin-bottom: 5px; font-size:0.75rem; }
+    .table-container { width: 98vw; overflow-x: auto; }
+    table { width: auto; font-size: 0.85rem; }
+    th, td { padding:0.375rem 0.5rem; }
+}
+</style>
 </head>
-
 <body>
+<div class="container">
+    <div class="header">
+        <div class="chrono-time paused" id="chrono-time">
+            <span id="chrono-text">--:--:--</span>
+        </div>
+    </div>
+    <div id="loading" class="loading">Connexion...</div>
+    <div id="compteurs" class="counter-line hidden">
+        <span class="counter-10km">10 km : 0</span>
+        <span>•</span>
+        <span class="counter-20km">20 km : 0</span>
+        <span> • </span>
+        <span class="counter-total">Total : 0</span>
+    </div>
+</div>
 
-    <h1>Test Firebase</h1>
+<div class="table-container hidden" id="table-container">
+    <table id="classement">
+        <thead>
+            <tr>
+                <th class="text-center">Dossard</th>
+                <th>Nom</th>
+                <th>Prénom</th>
+                <th class="text-center">Temps</th>
+                <th class="text-center">Course</th>
+                <th class="text-center">Scratch</th>
+                <th class="text-center">Genre</th>
+                <th class="text-center">Pos. Genre</th>
+                <th class="text-center">CAT</th>
+                <th class="text-center">Pos. CAT</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
 
-    <pre id="result">Connexion...</pre>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script>
+'use strict';
 
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAIAAz51gEGKQd0EoqA3yUhvnqw3DkQiIo",
+    authDomain: "calor-run.firebaseapp.com",
+    databaseURL: "https://calor-run-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "calor-run",
+    storageBucket: "calor-run.firebasestorage.app",
+    messagingSenderId: "329949291334",
+    appId: "1:329949291334:web:c71ef20268c609cf953b47",
+    measurementId: "G-YVQPW6JGPK"
+};
 
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+const COURSE_ALIASES = {
+    '10': '10km', '10km': '10km', '10 km': '10km',
+    '20': '20km', '20km': '20km', '20 km': '20km'
+};
 
-    <script>
+const elements = {
+    chronoTime: document.getElementById('chrono-time'),
+    chronoText: document.getElementById('chrono-text'),
+    loading: document.getElementById('loading'),
+    compteurs: document.getElementById('compteurs'),
+    tbody: document.querySelector('#classement tbody'),
+    tableContainer: document.getElementById('table-container'),
+    counter10km: null,
+    counter20km: null,
+    counterTotal: null
+};
 
-        const config = {
-            apiKey: "AIzaSyAIAAz51gEGKQd0EoqA3yUhvnqw3DkQiIo",
-            authDomain: "calor-run.firebaseapp.com",
-            databaseURL: "https://calor-run-default-rtdb.europe-west1.firebasedatabase.app",
-            projectId: "calor-run",
-            storageBucket: "calor-run.firebasestorage.app",
-            messagingSenderId: "329949291334",
-            appId: "1:329949291334:web:c71ef20268c609cf953b47"
+elements.counter10km = elements.compteurs.querySelector('.counter-10km');
+elements.counter20km = elements.compteurs.querySelector('.counter-20km');
+elements.counterTotal = elements.compteurs.querySelector('.counter-total');
+
+let departureTimestamp = null;
+let participants = {};
+let scans = {};
+let chronoInterval = null;
+
+const app = firebase.initializeApp(FIREBASE_CONFIG);
+const db = firebase.database();
+
+function formatTime(ms) {
+    const totalSeconds = Math.floor(Math.abs(ms) / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+}
+
+function startChrono() {
+    clearInterval(chronoInterval);
+    if(!departureTimestamp){
+        elements.chronoText.textContent="--:--:--";
+        elements.chronoTime.classList.add('paused');
+        return;
+    }
+    elements.chronoTime.classList.remove('paused');
+    const updateChrono = ()=>{
+        const elapsed = Date.now()-departureTimestamp;
+        elements.chronoText.textContent = formatTime(elapsed);
+    };
+    updateChrono();
+    chronoInterval = setInterval(updateChrono,1000);
+}
+
+function createTableRow(participant){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td class="text-center">${participant.dossard}</td>
+        <td>${participant.nom}</td>
+        <td>${participant.prenom}</td>
+        <td class="text-center">${participant.tempsStr}</td>
+        <td class="text-center">${participant.course}</td>
+        <td class="text-center">${participant.scratch}</td>
+        <td class="text-center">${participant.genre||''}</td>
+        <td class="text-center">${participant.posGenre}</td>
+        <td class="text-center">${participant.categorie||''}</td>
+        <td class="text-center">${participant.posCat}</td>
+    `;
+    return tr;
+}
+
+function calculatePositions(classement){
+    const scratchCounter={}, genreCounter={}, catCounter={};
+    let count10=0, count20=0, total10=0, total20=0;
+    Object.values(participants).forEach(p=>{
+        const courseNormalized = COURSE_ALIASES[String(p.course).trim()]||p.course;
+        if(courseNormalized==='10km') total10++; else if(courseNormalized==='20km') total20++;
+    });
+    for(let i=classement.length-1;i>=0;i--){
+        const p = classement[i];
+        const courseNormalized = COURSE_ALIASES[String(p.course).trim()]||p.course;
+        if(courseNormalized==='10km') count10++; else if(courseNormalized==='20km') count20++;
+        scratchCounter[p.course] = (scratchCounter[p.course]||0)+1; p.scratch=scratchCounter[p.course];
+        const genreKey=`${p.course}_${p.genre}`; genreCounter[genreKey]=(genreCounter[genreKey]||0)+1; p.posGenre=genreCounter[genreKey];
+        const catKey=`${p.course}_${p.genre}_${p.categorie}`; catCounter[catKey]=(catCounter[catKey]||0)+1; p.posCat=catCounter[catKey];
+    }
+    return {count10,count20,total10,total20};
+}
+
+function displayData(classement,count10,count20,total10,total20){
+    const fragment = document.createDocumentFragment();
+    classement.forEach(p=>fragment.appendChild(createTableRow(p)));
+    elements.tbody.innerHTML=''; elements.tbody.appendChild(fragment);
+    elements.loading.classList.add('hidden');
+    elements.compteurs.classList.remove('hidden');
+    elements.tableContainer.classList.remove('hidden');
+    elements.counter10km.textContent=`10 km : ${count10}/${total10}`;
+    elements.counter20km.textContent=`20 km : ${count20}/${total20}`;
+    elements.counterTotal.textContent=`Total : ${classement.length}/${total10+total20}`;
+    const displayedTotal = classement.length, expectedTotal=count10+count20;
+    if(displayedTotal!==expectedTotal) elements.counterTotal.classList.add('counter-error');
+    else elements.counterTotal.classList.remove('counter-error');
+}
+
+function updateClassement(){
+    if (!departureTimestamp || Object.keys(scans).length === 0) {return;}
+    const classement = Object.keys(scans).map(dossard => {
+        const valeurExcel = Number(scans[dossard]);
+        const scanTimestamp = Math.round((valeurExcel - 25569) * 86400000);
+        const p = participants[String(dossard)] || {};
+        const tempsMs = scanTimestamp - departureTimestamp;
+        return {
+            dossard: dossard,
+            nom: p.nom || '',
+            prenom: p.prenom || '',
+            tempsMs: tempsMs,
+            tempsStr: formatTime(tempsMs),
+            course: p.course || '',
+            genre: p.sexe || '',
+            categorie: p.categorie || ''
         };
+    })
+    .filter(p => Number.isFinite(p.tempsMs))
+    .sort((a, b) => b.tempsMs - a.tempsMs);
 
-        firebase.initializeApp(config);
+    const {
+        count10,
+        count20,
+        total10,
+        total20
+    } = calculatePositions(classement);
 
-        const db = firebase.database();
+    displayData(
+        classement,
+        count10,
+        count20,
+        total10,
+        total20
+    );
+}
 
-        db.ref('live_scratch').once('value')
-            .then(snapshot => {
+db.ref('data/depart_course').on('value', snapshot => {
+    departureTimestamp = snapshot.exists()
+        ? new Date(snapshot.val()).getTime()
+        : null;
+    startChrono();
+    updateClassement();
+});
 
-                console.log(snapshot.val());
+db.ref('participants').on('value', snapshot => {
+    participants = snapshot.val() || {};
+    updateClassement();
+});
 
-                document.getElementById('result').textContent =
-                    JSON.stringify(
-                        snapshot.val(),
-                        null,
-                        2
-                    );
+db.ref('live_scratch').on('value', snapshot => {
+    scans = snapshot.val() || {};
+    updateClassement();
+});
 
-            })
-            .catch(error => {
-
-                console.error(error);
-
-                document.getElementById('result').textContent =
-                    'ERREUR : ' + error.message;
-
-            });
-
-    </script>
-
+window.addEventListener('beforeunload',()=>{ if(chronoInterval) clearInterval(chronoInterval); });
+</script>
 </body>
-
 </html>
