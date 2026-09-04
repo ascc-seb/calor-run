@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Live Calor Run</title>
-data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⏱️</text></svg>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⏱️</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono:wght@400&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -126,7 +126,7 @@ tbody tr:nth-child(even){ background: var(--bg-light); }
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <script>
 'use strict';
 
@@ -162,38 +162,13 @@ elements.counter10km = elements.compteurs.querySelector('.counter-10km');
 elements.counter20km = elements.compteurs.querySelector('.counter-20km');
 elements.counterTotal = elements.compteurs.querySelector('.counter-total');
 
-let departureMs = null;   // instant réel du départ (ms epoch)
+let departureTimestamp = null;
 let participants = {};
-let scans = {};           // = nœud live_scratch { dossard: serieExcel }
+let scans = {};
 let chronoInterval = null;
 
 const app = firebase.initializeApp(FIREBASE_CONFIG);
 const db = firebase.database();
-
-/* ---------- Conversion des temps ---------- */
-
-// Convertit une valeur en ms epoch :
-//  - nombre  -> numéro de série Excel (heure locale naïve) ex: 46269.5378501157
-//  - chaîne  -> date ISO standard      ex: "2026-09-19T07:00:00.000Z"
-function toEpochMs(value) {
-    if (value === undefined || value === null || value === '') return null;
-    if (typeof value === 'number') {
-        const naiveUtc = (value - 25569) * 86400000;                 // série Excel -> ms (vu comme UTC)
-        return naiveUtc + new Date(naiveUtc).getTimezoneOffset() * 60000; // recale vers l'heure locale réelle
-    }
-    const num = Number(value);
-    if (!isNaN(num) && String(value).trim() !== '') return toEpochMs(num); // série Excel envoyée en texte
-    const t = new Date(value).getTime();                             // chaîne ISO
-    return isNaN(t) ? null : t;
-}
-
-// Un scan peut être la valeur brute (live_scratch: {1: 46269.53}) ou un objet {dateTime: ...}
-function scanToMs(scan) {
-    const raw = (scan !== null && typeof scan === 'object')
-        ? (scan.dateTime ?? scan.temps ?? scan.Temps ?? scan.value ?? null)
-        : scan;
-    return toEpochMs(raw);
-}
 
 function formatTime(ms) {
     const totalSeconds = Math.floor(Math.abs(ms) / 1000);
@@ -205,14 +180,14 @@ function formatTime(ms) {
 
 function startChrono() {
     clearInterval(chronoInterval);
-    if(departureMs===null){
+    if(!departureTimestamp){
         elements.chronoText.textContent="--:--:--";
         elements.chronoTime.classList.add('paused');
         return;
     }
     elements.chronoTime.classList.remove('paused');
     const updateChrono = ()=>{
-        const elapsed = Date.now()-departureMs;
+        const elapsed = Date.now()-departureTimestamp;
         elements.chronoText.textContent = formatTime(elapsed);
     };
     updateChrono();
@@ -270,29 +245,39 @@ function displayData(classement,count10,count20,total10,total20){
 }
 
 function updateClassement(){
-    if(departureMs===null||Object.keys(scans).length===0) return;
-    const classement=Object.keys(scans).map(dossard=>{
-        const p=participants[dossard]||{};
-        const arriveeMs=scanToMs(scans[dossard]);
-        const tempsMs=(arriveeMs!==null)?arriveeMs-departureMs:0;
+    if(!departureTimestamp || Object.keys(scans).length===0) return;
+    const EXCEL_EPOCH = 25569; // 01/01/1970
+    const classement = Object.keys(scans).map(dossard => {
+        const excelValue = Number(scans[dossard]);
+        const scanTimestamp = (excelValue - EXCEL_EPOCH) * 86400000;
+        const p = participants[dossard] || {};
+        const tempsMs = scanTimestamp - departureTimestamp;
         return {
             dossard,
-            nom:p.nom||'',
-            prenom:p.prenom||'',
+            nom: p.nom || '',
+            prenom: p.prenom || '',
             tempsMs,
-            tempsStr:formatTime(tempsMs),
-            course:p.course||'',
-            genre:p.sexe||'',
-            categorie:p.categorie||''
+            tempsStr: formatTime(tempsMs),
+            course: p.course || '',
+            genre: p.sexe || '',
+            categorie: p.categorie || ''
         };
-    }).sort((a,b)=>b.tempsMs-a.tempsMs);
+    }).filter(p => !isNaN(p.tempsMs))
+      .sort((a,b)=>b.tempsMs-a.tempsMs);
+
     const {count10,count20,total10,total20}=calculatePositions(classement);
-    displayData(classement,count10,count20,total10,total20);
+    
+    displayData(
+        classement,
+        count10,
+        count20,
+        total10,
+        total20
+    );
 }
 
-db.ref('data/depart_course').on('value',snapshot=>{
-    departureMs = snapshot.exists() ? toEpochMs(snapshot.val()) : null;
-    startChrono();
+db.ref('live_scratch').on('value',snapshot=>{
+    scans=snapshot.val()||{};
     updateClassement();
 });
 
@@ -301,7 +286,7 @@ db.ref('participants').on('value',snapshot=>{
     updateClassement();
 });
 
-db.ref('live_scratch').on('value',snapshot=>{
+db.ref('scan_dossards').on('value',snapshot=>{
     scans=snapshot.val()||{};
     updateClassement();
 });
