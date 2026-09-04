@@ -286,9 +286,12 @@ db.ref('participants').on('value',snapshot=>{
     updateClassement();
 });
 
-db.ref('scan_dossards').on('value',snapshot=>{
-    scans=snapshot.val()||{};
-    updateClassement();
+db.ref('data/depart_course').on('value',snapshot=>{
+departureTimestamp=snapshot.exists()
+? new Date(snapshot.val()).getTime()
+: null;
+ console.log("depart", departureTimestamp);
+if(departureTimestamp) startChrono();
 });
 
 window.addEventListener('beforeunload',()=>{ if(chronoInterval) clearInterval(chronoInterval); });
