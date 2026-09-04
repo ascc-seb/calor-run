@@ -278,11 +278,13 @@ function updateClassement(){
 
 db.ref('live_scratch').on('value',snapshot=>{
     scans=snapshot.val()||{};
+    console.log("participants", live_scratch);
     updateClassement();
 });
 
 db.ref('participants').on('value',snapshot=>{
     participants=snapshot.val()||{};
+    console.log("participants", participants);
     updateClassement();
 });
 
