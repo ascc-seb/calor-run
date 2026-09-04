@@ -245,28 +245,33 @@ function displayData(classement,count10,count20,total10,total20){
 }
 
 function updateClassement(){
-    if(!departureTimestamp || Object.keys(scans).length===0) return;
-    const EXCEL_EPOCH = 25569; // 01/01/1970
+    if (!departureTimestamp || Object.keys(scans).length === 0) {return;}
     const classement = Object.keys(scans).map(dossard => {
-        const excelValue = Number(scans[dossard]);
-        const scanTimestamp = (excelValue - EXCEL_EPOCH) * 86400000;
-        const p = participants[dossard] || {};
+        const valeurExcel = Number(scans[dossard]);
+        const scanTimestamp = Math.round((valeurExcel - 25569) * 86400000);
+        const p = participants[String(dossard)] || {};
         const tempsMs = scanTimestamp - departureTimestamp;
         return {
-            dossard,
+            dossard: dossard,
             nom: p.nom || '',
             prenom: p.prenom || '',
-            tempsMs,
+            tempsMs: tempsMs,
             tempsStr: formatTime(tempsMs),
             course: p.course || '',
             genre: p.sexe || '',
             categorie: p.categorie || ''
         };
-    }).filter(p => !isNaN(p.tempsMs))
-      .sort((a,b)=>b.tempsMs-a.tempsMs);
+    })
+    .filter(p => Number.isFinite(p.tempsMs))
+    .sort((a, b) => b.tempsMs - a.tempsMs);
 
-    const {count10,count20,total10,total20}=calculatePositions(classement);
-    
+    const {
+        count10,
+        count20,
+        total10,
+        total20
+    } = calculatePositions(classement);
+
     displayData(
         classement,
         count10,
@@ -276,24 +281,22 @@ function updateClassement(){
     );
 }
 
-db.ref('live_scratch').on('value',snapshot=>{
-    scans=snapshot.val()||{};
-    console.log("live_scratch", scans);
+db.ref('data/depart_course').on('value', snapshot => {
+    departureTimestamp = snapshot.exists()
+        ? new Date(snapshot.val()).getTime()
+        : null;
+    startChrono();
     updateClassement();
 });
 
-db.ref('participants').on('value',snapshot=>{
-    participants=snapshot.val()||{};
-    console.log("participants", participants);
+db.ref('participants').on('value', snapshot => {
+    participants = snapshot.val() || {};
     updateClassement();
 });
 
-db.ref('data/depart_course').on('value',snapshot=>{
-departureTimestamp=snapshot.exists()
-? new Date(snapshot.val()).getTime()
-: null;
- console.log("depart", departureTimestamp);
-if(departureTimestamp) startChrono();
+db.ref('live_scratch').on('value', snapshot => {
+    scans = snapshot.val() || {};
+    updateClassement();
 });
 
 window.addEventListener('beforeunload',()=>{ if(chronoInterval) clearInterval(chronoInterval); });
