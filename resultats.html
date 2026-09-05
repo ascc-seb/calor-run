@@ -212,7 +212,7 @@ const render = () => {
     : Object.values(participants).length;
 
   // Compteur
-  el.counter.innerHTML = <a href="?distance=10">10 km</a> • + <a href="?distance=20">20 km</a> • + Arrivées : ${data.length}/${total};
+  el.counter.innerHTML = <a href="?distance=10">10 km</a> • <a href="?distance=20">20 km</a> • Arrivées : ${data.length}/${total};
 
   // Distance active
   const activeLink = el.counter.querySelector('a[href="?distance=' + COURSE_DISTANCE + '"]');
