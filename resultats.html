@@ -167,7 +167,7 @@ if (distanceParam === '10' || distanceParam === '20') {
 const db = {
   depart: firebase.database().ref('data/depart_course'),
   participants: firebase.database().ref('participants'),
-  scans: firebase.database().ref('live_trail')
+  scans: firebase.database().ref('live_scratch')
 };
 
 const el = {
@@ -189,90 +189,101 @@ const formatTime = ms => {
   return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
 };
 
+// === Conversion date Excel/Firebase vers timestamp ===
+const excelDateToMs = excelDate => {return Math.round((excelDate - 25569) * 86400 * 1000);};
+  
 // === Rendu du tableau ===
 const render = () => {
   if (!departure) return;
-
-  let data = Object.entries(scans).map(([id, scan]) => {
-    const p = participants[id];
-    if(!p || (COURSE_DISTANCE && p.course!==COURSE_DISTANCE)) return null;
-    const t = new Date(scan.dateTime).getTime()-departure;
-    return {...p, dossard:id, tempsMs:t, tempsStr:formatTime(t)};
+  let data = Object.entries(scans).map(([dossard, scanDate]) => {
+    const p = participants[dossard];
+    if (!p) return null;
+    if (COURSE_DISTANCE && String(p.course) !== String(COURSE_DISTANCE)) {return null;} // Filtre selon la distance
+    const scanTime = excelDateToMs(Number(scanDate)); // live_scratch contient directement une date Excel
+    const t = scanTime - departure; // Calcul du temps depuis le départ
+    if (t < 0) return null; // Ignore les temps négatifs éventuels
+    return {...p, dossard: dossard, tempsMs: t, tempsStr: formatTime(t)};
   }).filter(Boolean);
-  
-  const total = COURSE_DISTANCE 
-    ? Object.values(participants).filter(p=>p.course===COURSE_DISTANCE).length 
+
+  const total = COURSE_DISTANCE // Nombre total de participants
+    ? Object.values(participants)
+    .filter(p => String(p.course) === String(COURSE_DISTANCE))
+    .length
     : Object.values(participants).length;
-  el.counter.innerHTML = `<a href="?distance=10">10 km</a> • <a href="?distance=20">20 km</a> • Arrivées : ${data.length}/${total}`;
 
+  // Compteur
+  el.counter.innerHTML = <a href="?distance=10">10 km</a> • + <a href="?distance=20">20 km</a> • + Arrivées : ${data.length}/${total};
+
+  // Distance active
   const activeLink = el.counter.querySelector('a[href="?distance=' + COURSE_DISTANCE + '"]');
-  if (activeLink && COURSE_DISTANCE) activeLink.classList.add("active");
+  if (activeLink && COURSE_DISTANCE) {activeLink.classList.add("active");}
 
-  data.sort((a,b)=>a.tempsMs-b.tempsMs);
+  // Tri par temps
+  data.sort((a, b) => a.tempsMs - b.tempsMs);
 
+  // Classements
   const classementGenre = {};
   const classementCat = {};
-  data.forEach((p,i)=>{
-    p.scratch = i+1;
-    classementGenre[p.genre] = (classementGenre[p.genre]||0)+1;
-    p.posGenre = classementGenre[p.genre];
-    const catKey = `${p.genre}_${p.categorie}`;
-    classementCat[catKey] = (classementCat[catKey]||0)+1;
-    p.posCat = classementCat[catKey];
-  });
+  data.forEach((p, i) => {
 
-  tableRows.clear();
-  const frag = document.createDocumentFragment();
-  data.forEach(p=>{
-    const tr = document.createElement('tr');
-    if (p.genre === 'F') tr.classList.add('femme');
-    tr.innerHTML = `
-      <td class="text-center">${p.scratch}</td>
-      <td class="text-center">${p.dossard}</td>
-      <td>${p.nom}</td>
-      <td>${p.prenom}</td>
-      <td class="text-center">${p.tempsStr}</td>
-      <td class="text-center">${p.genre||''}</td>
-      <td class="text-center">${p.posGenre}</td>
-      <td class="text-center">${p.categorie||''}</td>
-      <td class="text-center">${p.posCat}</td>
-    `;
-    frag.appendChild(tr);
-    tableRows.set(tr,tr);
-  });
-  el.tbody.innerHTML='';
-  el.tbody.appendChild(frag);
-  el.table.classList.remove('hidden');
-};
+// Scratch général
+p.scratch = i + 1;
 
-// === Recherche avec debounce ===
-let searchTimeout;
-el.search.addEventListener('input', e => {
-  clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(() => {
-    const term = e.target.value.toLowerCase().trim();
-    let genreFilter = '', catFilter = '', nameFilter = term;
 
-    if (/^(h|f)([a-z0-9]+)$/i.test(term)) {
-      const match = term.match(/^(h|f)([a-z0-9]+)$/i);
-      genreFilter = match[1].toUpperCase();
-      catFilter = match[2].toUpperCase();
-      nameFilter = '';
-    }
+// Classement par genre
+classementGenre[p.genre] =
+  (classementGenre[p.genre] || 0) + 1;
 
-    tableRows.forEach(tr => {
-      if (!tr.dataset.cachedText) tr.dataset.cachedText = tr.textContent.toLowerCase();
-      const text = tr.dataset.cachedText;
-      const pGenre = tr.children[5].textContent.toUpperCase();
-      const pCat = tr.children[7].textContent.toUpperCase();
-      let show = true;
-      if (genreFilter) show = pGenre === genreFilter;
-      if (show && catFilter) show = pCat === catFilter;
-      if (show && nameFilter) show = text.includes(nameFilter);
-      tr.style.display = show ? '' : 'none';
-    });
-  }, 200);
+p.posGenre = classementGenre[p.genre];
+
+
+// Classement par catégorie + genre
+const catKey = `${p.genre}_${p.categorie}`;
+
+classementCat[catKey] =
+  (classementCat[catKey] || 0) + 1;
+
+p.posCat = classementCat[catKey];
+
 });
+
+// Création du tableau
+tableRows.clear();
+
+const frag = document.createDocumentFragment();
+
+data.forEach(p => {
+
+const tr = document.createElement('tr');
+
+if (p.genre === 'F') {
+  tr.classList.add('femme');
+}
+
+tr.innerHTML = `
+  <td class="text-center">${p.scratch}</td>
+  <td class="text-center">${p.dossard}</td>
+  <td>${p.nom || ''}</td>
+  <td>${p.prenom || ''}</td>
+  <td class="text-center">${p.tempsStr}</td>
+  <td class="text-center">${p.genre || ''}</td>
+  <td class="text-center">${p.posGenre}</td>
+  <td class="text-center">${p.categorie || ''}</td>
+  <td class="text-center">${p.posCat}</td>
+`;
+
+frag.appendChild(tr);
+
+tableRows.set(tr, tr);
+
+});
+
+el.tbody.innerHTML = '';
+
+el.tbody.appendChild(frag);
+
+el.table.classList.remove('hidden');
+};
 
 // === Firebase Listeners sécurisés ===
 const safeListener = (ref, callback) => {
