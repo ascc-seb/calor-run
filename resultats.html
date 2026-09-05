@@ -197,9 +197,9 @@ const render = () => {
     const p = participants[id];
     if(!p || (COURSE_DISTANCE && p.course!==COURSE_DISTANCE)) return null;
     const t = new Date(scan.dateTime).getTime()-departure;
-    return {...p, tempsMs:t, tempsStr:formatTime(t)};
+    return {...p, dossard:id, tempsMs:t, tempsStr:formatTime(t)};
   }).filter(Boolean);
-
+  
   const total = COURSE_DISTANCE 
     ? Object.values(participants).filter(p=>p.course===COURSE_DISTANCE).length 
     : Object.values(participants).length;
