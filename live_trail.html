@@ -180,18 +180,29 @@ function formatTime(ms) {
 
 function startChrono() {
     clearInterval(chronoInterval);
-    if(!departureTimestamp){
-        elements.chronoText.textContent="--:--:--";
+    if (!departureTimestamp) {
+        elements.chronoText.textContent = "--:--:--";
+        elements.chronoTime.classList.add('paused');
+        return;
+    }
+    const now = new Date();
+    const depart = new Date(departureTimestamp);
+    const memeJour =
+        now.getFullYear() === depart.getFullYear() &&
+        now.getMonth() === depart.getMonth() &&
+        now.getDate() === depart.getDate();
+    if (!memeJour) {
+        elements.chronoText.textContent = "--:--:--";
         elements.chronoTime.classList.add('paused');
         return;
     }
     elements.chronoTime.classList.remove('paused');
-    const updateChrono = ()=>{
-        const elapsed = Date.now()-departureTimestamp;
+    const updateChrono = () => {
+        const elapsed = Date.now() - departureTimestamp;
         elements.chronoText.textContent = formatTime(elapsed);
     };
     updateChrono();
-    chronoInterval = setInterval(updateChrono,1000);
+    chronoInterval = setInterval(updateChrono, 1000);
 }
 
 function createTableRow(participant){
