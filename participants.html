@@ -186,7 +186,7 @@
           <td>${p.club || '-'}</td>
           <td class="text-center">${p.genre}</td>
           <td class="text-center">${p.categorie}</td>
-          <td class="text-center">${p.course} km</td>`;
+          <td class="text-center">${!isNaN(p.course) && p.course !== '' ? `${p.course} km`: p.course}</td>`;
         fragment.appendChild(row);
       });
       elements.tbody.innerHTML = '';
@@ -301,10 +301,14 @@
       onValue(dbRef, snapshot => {
         const data = snapshot.val();
         if (data) {
-          AppState.allData = Object.values(data).map(p=>({
-            dossard:p.dossard||'', nom:p.nom||'', prenom:p.prenom||'',
-            club:p.club||'', genre:p.genre||'', categorie:p.categorie||'',
-            course:p.course||''
+          AppState.allData = Object.entries(data).map(([dossard, p]) => ({
+            dossard,
+            nom: p.nom || '',
+            prenom: p.prenom || '',
+            club: p.club || '',
+            genre: p.genre || '',
+            categorie: p.categorie || '',
+            course: p.course || ''
           }));
           AppState.filteredData=[...AppState.allData]; AppState.isLoading=false;
           sortData('dossard','asc');
