@@ -161,8 +161,7 @@ const FIREBASE_CONFIG = {
     measurementId: "G-YVQPW6JGPK"
 };
 
-firebase.initializeApp(FIREBASE_CONFIG);
-const db = firebase.database();
+const COURSE_ALIASES = { '10': '10km', '10km': '10km', '10 km': '10km', '20': '20km', '20km': '20km', '20 km': '20km' };
 
 const elements = {
     loading: document.getElementById('loading'),
@@ -175,286 +174,121 @@ const elements = {
 
 let departureTimestamp = null;
 let participants = {};
-let liveScratch = {};
-let selectedCourse = '10km';
+let scans = {};
+let selectedCourse = '10km'; // par défaut
 
-function normalizeCourse(value) {
-
-    if (value === undefined || value === null) {
-        return '';
-    }
-
-    const v = String(value).trim();
-
-    switch (v) {
-        case '10':
-        case '10km':
-        case '10 km':
-            return '10km';
-
-        case '20':
-        case '20km':
-        case '20 km':
-            return '20km';
-
-        default:
-            return '';
-    }
-}
-
-function excelDateToJS(excelDate) {
-
-    return new Date(
-        (Number(excelDate) - 25569) * 86400 * 1000
-    );
-}
+const app = firebase.initializeApp(FIREBASE_CONFIG);
+const db = firebase.database();
 
 function formatTime(ms) {
-
-    if (ms < 0) return '--:--:--';
-
-    const totalSeconds = Math.floor(ms / 1000);
-
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = totalSeconds % 60;
-
-    return `${h.toString().padStart(2,'0')}:${
-        m.toString().padStart(2,'0')
-    }:${
-        s.toString().padStart(2,'0')
-    }`;
+    const totalSeconds = Math.floor(Math.abs(ms) / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
 }
 
-function getRanking(courseFilter, categoryFilter, genderFilter) {
-
-    if (!departureTimestamp) {
-        return [];
-    }
-
-    return Object.entries(liveScratch)
-
-        .map(([dossard, excelTime]) => {
-
-            const participant = participants[dossard];
-
-            if (!participant) {
-                return null;
-            }
-
-            const scanDate = excelDateToJS(excelTime);
-
-            const tempsMs =
-                scanDate.getTime() - departureTimestamp;
-
-            return {
-                dossard,
-                nom: participant.nom || '',
-                prenom: participant.prenom || '',
-                categorie: participant.categorie || '',
-                genre: participant.genre || '',
-                course: normalizeCourse(participant.course),
-                tempsMs,
-                tempsStr: formatTime(tempsMs)
-            };
-        })
-
-        .filter(Boolean)
-
-        .filter(r => {
-
-            const courseOK =
-                !courseFilter ||
-                r.course === courseFilter;
-
-            const catOK =
-                !categoryFilter ||
-                r.categorie === categoryFilter;
-
-            const genreOK =
-                !genderFilter ||
-                r.genre === genderFilter;
-
-            return courseOK && catOK && genreOK;
-        })
-
-        .sort((a, b) => a.tempsMs - b.tempsMs)
-
-        .slice(0, 3);
+function getTop3Filtered(courseFilter, catFilter, genreFilter){
+    const classement = Object.keys(scans).map(dossard=>{
+        const scan=scans[dossard], p=participants[dossard]||{};
+        const tempsMs = new Date(scan.dateTime).getTime()-departureTimestamp;
+        return {nom:p.nom||'', prenom:p.prenom||'', tempsMs, tempsStr: formatTime(tempsMs), categorie:p.categorie||'', course:p.course||'', genre:p.genre||''};
+    }).filter(p=>{
+        const courseNorm = COURSE_ALIASES[p.course]||p.course;
+        const catOk = !catFilter || p.categorie === catFilter;
+        const courseOk = !courseFilter || courseNorm === courseFilter;
+        const genreOk = !genreFilter || p.genre===genreFilter;
+        return catOk && courseOk && genreOk;
+    }).sort((a,b)=>a.tempsMs-b.tempsMs);
+    return classement.slice(0,3);
 }
 
-function renderTable(tbody, classement, femme = false) {
-
-    tbody.innerHTML = '';
-
-    const podiums = femme
-        ? ['🥇 1ère', '🥈 2ème', '🥉 3ème']
-        : ['🥇 1er', '🥈 2ème', '🥉 3ème'];
-
-    podiums.forEach((libelle, index) => {
-
-        const p = classement[index];
-
+function renderTable(tbody, data, isFemme=false){
+    tbody.innerHTML='';
+    const podiums = isFemme ? ['🥇 1ère','🥈 2ème','🥉 3ème'] : ['🥇 1er','🥈 2ème','🥉 3ème'];
+    podiums.forEach((podium,i)=>{
+        const p = data[i];
         const tr = document.createElement('tr');
-
-        tr.innerHTML = `
-            <td>${libelle}</td>
-            <td>${p ? p.nom : ''}</td>
-            <td>${p ? p.prenom : ''}</td>
-            <td>${p ? p.tempsStr : ''}</td>
-            <td>${p ? p.categorie : ''}</td>
-        `;
-
+        tr.innerHTML = `<td>${podium}</td>
+                        <td>${p?p.nom:''}</td>
+                        <td>${p?p.prenom:''}</td>
+                        <td>${p?p.tempsStr:''}</td>
+                        <td>${p?p.categorie:''}</td>`;
         tbody.appendChild(tr);
     });
 }
 
-function updateTables() {
-
-    if (!departureTimestamp) {
-        return;
-    }
-
-    const categoryFilter =
-        elements.filterCat.value;
-
-    const topHommes =
-        getRanking(
-            selectedCourse,
-            categoryFilter,
-            'H'
-        );
-
-    const topFemmes =
-        getRanking(
-            selectedCourse,
-            categoryFilter,
-            'F'
-        );
-
-    renderTable(
-        elements.tableHomme,
-        topHommes,
-        false
-    );
-
-    renderTable(
-        elements.tableFemme,
-        topFemmes,
-        true
-    );
+function updateTables(){
+    const catFilter = elements.filterCat.value;
+    const topH = getTop3Filtered(selectedCourse, catFilter, 'H');
+    const topF = getTop3Filtered(selectedCourse, catFilter, 'F');
+    renderTable(elements.tableHomme, topH, false);
+    renderTable(elements.tableFemme, topF, true);
 }
 
-function populateCategories() {
+function populateCategories(){
+    const cats = new Set(Object.values(participants).map(p=>p.categorie).filter(Boolean));
 
-    const categories = [...new Set(
-        Object.values(participants)
-            .map(p => p.categorie)
-            .filter(Boolean)
-    )];
-
-    categories.sort((a, b) => {
-
-        const order = {
-            CA: 1,
-            JU: 2,
-            ES: 3,
-            SE: 4
-        };
-
-        const aM = /^M\d+$/.test(a);
-        const bM = /^M\d+$/.test(b);
-
-        if (aM && bM) {
-            return parseInt(a.slice(1))
-                 - parseInt(b.slice(1));
+    // Trouver le plus grand Mx présent
+    let maxM = 0;
+    cats.forEach(c=>{
+        if(/^M\d+$/.test(c)){
+            const num = parseInt(c.slice(1));
+            if(num > maxM) maxM = num;
         }
-
-        return (order[a] || 999)
-             - (order[b] || 999);
     });
 
-    elements.filterCat.innerHTML =
-        '<option value="">Toutes catégories</option>';
+    // Ordre fixe
+    const order = ["CA","JU","ES","SE"];
 
-    categories.forEach(cat => {
+    // Ajout dynamique des Mx (jusqu'au max existant, max 10)
+    for(let i=0; i<=Math.min(maxM,10); i++){
+        order.push("M"+i);
+    }
 
-        const option =
-            document.createElement('option');
-
-        option.value = cat;
-        option.textContent = cat;
-
-        elements.filterCat.appendChild(option);
+    elements.filterCat.innerHTML='<option value="">Toutes catégories</option>';
+    order.forEach(c=>{
+        if(cats.has(c)){
+            const opt=document.createElement('option');
+            opt.value=c;
+            opt.textContent=c;
+            elements.filterCat.appendChild(opt);
+        }
     });
 }
 
-db.ref('data/depart_course')
-.on('value', snap => {
-
-    if (snap.exists()) {
-
-        departureTimestamp =
-            new Date(snap.val()).getTime();
-
-        updateTables();
-    }
+db.ref('data/depart_course').on('value', snapshot=>{
+    departureTimestamp=snapshot.exists()?new Date(snapshot.val()).getTime():null;
 });
 
-db.ref('participants')
-.on('value', snap => {
-
-    participants = snap.val() || {};
-
-    populateCategories();
-
+db.ref('participants').on('value', snapshot=>{
+    participants=snapshot.val()||{};
     elements.loading.classList.add('hidden');
     elements.filterBar.classList.remove('hidden');
     elements.tables.classList.remove('hidden');
-
+    populateCategories();
     updateTables();
-});
 
-db.ref('live_scratch')
-.on('value', snap => {
-
-    liveScratch = snap.val() || {};
-
-    updateTables();
-});
-
-elements.filterCat.addEventListener(
-    'change',
-    updateTables
-);
-
-document
-.querySelectorAll('.filter-course')
-.forEach(link => {
-
-    link.addEventListener('click', e => {
-
-        selectedCourse =
-            e.target.dataset.course;
-
-        document
-            .querySelectorAll('.filter-course')
-            .forEach(btn =>
-                btn.classList.remove('active')
-            );
-
-        e.target.classList.add('active');
-
-        updateTables();
+    // Marquer le 10 km actif par défaut
+    document.querySelectorAll('.filter-course').forEach(a=>{
+        if(a.dataset.course === selectedCourse) a.classList.add('active');
     });
 });
 
-document
-.querySelector(
-        '.filter-course[data-course="10km"]'
-)
-?.classList.add('active');
+db.ref('scan_dossards').on('value', snapshot=>{
+    scans=snapshot.val()||{};
+    updateTables();
+});
 
+elements.filterCat.addEventListener('change', updateTables);
+document.querySelectorAll('.filter-course').forEach(link=>{
+    link.addEventListener('click', e=>{
+        selectedCourse = e.target.dataset.course;
+        document.querySelectorAll('.filter-course').forEach(b=>b.classList.remove('active'));
+        e.target.classList.add('active');
+        updateTables();
+    });
+});
 </script>
 </body>
 </html>
