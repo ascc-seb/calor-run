@@ -266,7 +266,7 @@ function renderAges(body, data){
       course = m ? Number(m[1]) : 0;
     }
 
-    const birth = parseDate(p.date_naiss);
+    const birth = parseDate(p.naissance);
     const age = computeAge(birth);
     if(birth === null || age === null) return; // skip invalid
 
