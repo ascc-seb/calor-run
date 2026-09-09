@@ -257,7 +257,7 @@ function renderCats(body, data){
 
 function renderAges(body, data){
   const ages = {10: [], 20: []};
-  Object.values(data||{}).forEach(p=>{
+  Object.entries(data||{}).forEach(([dossard, p])=>{
     // robust course parsing
     let course = 0;
     if(typeof p.course === 'number') course = p.course;
@@ -270,7 +270,7 @@ function renderAges(body, data){
     const age = computeAge(birth);
     if(birth === null || age === null) return; // skip invalid
 
-    const pack = {dossard: p.dossard||'', prenom: p.prenom||'', nom: p.nom||'', age};
+    const pack = {dossard, prenom: p.prenom||'', nom: p.nom||'', age};
     if(course === 10) ages[10].push(pack);
     if(course === 20) ages[20].push(pack);
   });
