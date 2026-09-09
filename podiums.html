@@ -66,6 +66,10 @@ table th:nth-child(4),
 table td:nth-child(4) { width: 90px; text-align: center; }
 table th:nth-child(5),
 table td:nth-child(5) { width: 100px; text-align: center; }
+#table-clubs th:nth-child(3),
+#table-clubs td:nth-child(3) { width: 100px; text-align: center; }
+#table-clubs th:nth-child(4),
+#table-clubs td:nth-child(4) { width: 120px; text-align: center; }
 tbody tr:nth-child(even){ background: var(--bg-light); }
 .text-center { text-align:center; }
 .loading { text-align:center; padding:1.25rem 0; font-size:1rem; }
@@ -141,6 +145,23 @@ tbody tr:nth-child(even){ background: var(--bg-light); }
           <tbody></tbody>
       </table>
   </div>
+
+  <!-- Tableau Clubs -->
+  <div class="table-container">
+      <h3 style="color:var(--primary-color);">&nbsp;Podium Clubs</h3>
+      <table id="table-clubs">
+          <thead>
+              <tr>
+                  <th>Classement</th>
+                  <th>Club</th>
+                  <th>Inscrits</th>
+                  <th>Km totaux</th>
+              </tr>
+          </thead>
+          <tbody></tbody>
+      </table>
+  </div>
+
   <div id="loading" class="loading">Connexion...</div>
 </div>
 </div>
@@ -170,12 +191,19 @@ const elements = {
     filterCat: document.getElementById('filter-cat'),
     tables: document.getElementById('tables'),
     tableHomme: document.querySelector('#table-homme tbody'),
-    tableFemme: document.querySelector('#table-femme tbody')
+    tableFemme: document.querySelector('#table-femme tbody'),
+    tableClubs: document.querySelector('#table-clubs tbody')
 };
 
 let participants = {};
 let liveScratch = {};
 let selectedCourse = '10km';
+
+// Distance (en km) associée à chaque course, utilisée pour le total kilométrique des clubs
+const COURSE_KM = {
+    '10km': 10,
+    '20km': 20
+};
 
 function normalizeCourse(course) {
 
@@ -279,6 +307,45 @@ function getRanking(courseFilter, categoryFilter, genderFilter) {
         }));
 }
 
+// Classement des 3 clubs les plus représentés (toutes courses confondues),
+// avec le nombre total d'inscrits et le nombre total de km parcourus par le club
+function getClubRanking() {
+
+    const clubs = {};
+
+    Object.values(participants)
+        .forEach(p => {
+
+            const clubName =
+                (p.club || '').trim();
+
+            if (!clubName) {
+                return;
+            }
+
+            const course =
+                normalizeCourse(p.course);
+
+            const km =
+                COURSE_KM[course] || 0;
+
+            if (!clubs[clubName]) {
+                clubs[clubName] = {
+                    club: clubName,
+                    inscrits: 0,
+                    km: 0
+                };
+            }
+
+            clubs[clubName].inscrits += 1;
+            clubs[clubName].km += km;
+        });
+
+    return Object.values(clubs)
+        .sort((a,b) => b.inscrits - a.inscrits)
+        .slice(0,3);
+}
+
 function renderTable(tbody, classement, femme = false) {
 
     tbody.innerHTML = '';
@@ -300,6 +367,30 @@ function renderTable(tbody, classement, femme = false) {
             <td>${p ? p.prenom : ''}</td>
             <td>${p ? p.tempsStr : ''}</td>
             <td>${p ? p.categorie : ''}</td>
+        `;
+
+        tbody.appendChild(tr);
+    }
+}
+
+function renderClubTable(tbody, classement) {
+
+    tbody.innerHTML = '';
+
+    const podiums = ['🥇 1er','🥈 2ème','🥉 3ème'];
+
+    for(let i = 0 ; i < 3 ; i++) {
+
+        const c = classement[i];
+
+        const tr =
+            document.createElement('tr');
+
+        tr.innerHTML = `
+            <td>${podiums[i]}</td>
+            <td>${c ? c.club : ''}</td>
+            <td>${c ? c.inscrits : ''}</td>
+            <td>${c ? c.km : ''}</td>
         `;
 
         tbody.appendChild(tr);
@@ -335,6 +426,14 @@ function updateTables() {
         elements.tableFemme,
         podiumFemmes,
         true
+    );
+}
+
+function updateClubTable() {
+
+    renderClubTable(
+        elements.tableClubs,
+        getClubRanking()
     );
 }
 
@@ -414,6 +513,7 @@ db.ref('participants')
     );
 
     updateTables();
+    updateClubTable();
 });
 
 db.ref('live_scratch')
