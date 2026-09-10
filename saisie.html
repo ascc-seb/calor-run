@@ -67,22 +67,6 @@ body{
     color:#555;
     min-width:110px;
 }
-#pendingList{
-    list-style:none;
-    margin:14px 0 0 0;
-    padding:0;
-    width:90%;
-    max-width:500px;
-    max-height:160px;
-    overflow-y:auto;
-    font-family:monospace;
-    font-size:16px;
-    text-align:center;
-}
-#pendingList li{
-    padding:4px;
-    color:#555;
-}
 #pendingList li.err{
     color:#c62828;
     font-weight:bold;
@@ -140,7 +124,6 @@ const input = document.getElementById("num");
 const status = document.getElementById("status");
 const syncBtn = document.getElementById("syncBtn");
 const pendingCountEl = document.getElementById("pendingCount");
-const pendingListEl = document.getElementById("pendingList");
 
 function unixToExcelSerial(timestampMs) {
     const msPerDay = 86400000;
@@ -191,11 +174,6 @@ function nouvelId() {
 function renderBuffer() {
     pendingCountEl.textContent = buffer.length + " en attente";
     syncBtn.disabled = syncing || buffer.length === 0;
-    pendingListEl.innerHTML = buffer
-        .slice()
-        .reverse()
-        .map(e => `<li class="${e.error ? "err" : ""}">${e.valeur}${e.error ? " ⚠" : ""}</li>`)
-        .join("");
     sauvegarderTampon();
 }
 
