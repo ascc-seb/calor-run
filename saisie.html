@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<title>Saisie Rapide</title>
+<title>Saisie Dossards</title>
 
 <style>
 body{
@@ -51,11 +51,7 @@ body{
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-import {
-    getDatabase,
-    ref,
-    set
-} from "https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js";
+import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAIAAz51gEGKQd0EoqA3yUhvnqw3DkQiIo",
@@ -74,50 +70,34 @@ const db = getDatabase(app);
 const input = document.getElementById("num");
 const status = document.getElementById("status");
 
+function unixToExcelSerial(timestampMs) {
+    const msPerDay = 86400000;
+    const excelEpochOffset = 25569;
+    return (timestampMs / msPerDay) + excelEpochOffset;
+}
+
 async function envoyer() {
-
     const valeur = input.value.trim();
-
     if (!valeur) return;
 
-    const timestamp = Date.now();
+    const excelTime = unixToExcelSerial(Date.now());
 
     try {
-
-        await set(
-            ref(db, "saisie/" + valeur),
-            timestamp
-        );
-
+        await set( ref(db, "saisie/" + valeur), excelTime );
         status.textContent = "✔ Envoyé";
         input.value = "";
         input.focus();
-
-        setTimeout(() => {
-            status.textContent = "";
-        }, 500);
-
+        setTimeout(() => { status.textContent = ""; }, 500);
     } catch(e) {
         status.textContent = "❌ Erreur";
         console.error(e);
     }
 }
-
-input.addEventListener("keydown", e => {
-    if (e.key === "Enter") {
-        envoyer();
-    }
+input.addEventListener("keydown", e => { if (e.key === "Enter") { envoyer(); }
 });
 
-window.addEventListener("load", () => {
-    input.focus();
-});
-
-document.addEventListener("click", () => {
-    input.focus();
-});
-
+window.addEventListener("load", () => { input.focus(); });
+document.addEventListener("click", () => { input.focus(); });
 </script>
-
 </body>
 </html>
