@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://www.gstatic.com">
+<link rel="preconnect" href="https://calor-run-default-rtdb.europe-west1.firebasedatabase.app">
 
 <title>Saisie Rapide</title>
 
@@ -22,10 +24,12 @@ body{
     min-height:30px;
     margin-bottom:15px;
     text-align:center;
-    color:green;
     font-size:22px;
     font-weight:bold;
+    color:#222; /* neutre par défaut, piloté par classe */
 }
+#status.ok{ color:#2e7d32; }
+#status.err{ color:#c62828; }
 
 #num{
     width:90%;
@@ -34,20 +38,79 @@ body{
     text-align:center;
     padding:20px;
     box-sizing:border-box;
+    border:2px solid #ccc;
+    border-radius:8px;
+}
+#num.err{ border-color:#c62828; }
+
+#syncBar{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-top:18px;
+}
+#syncBtn{
+    font-size:18px;
+    padding:10px 20px;
+    border:none;
+    border-radius:6px;
+    background:#1565c0;
+    color:#fff;
+    cursor:pointer;
+}
+#syncBtn:disabled{
+    background:#9e9e9e;
+    cursor:default;
+}
+#pendingCount{
+    font-size:16px;
+    color:#555;
+    min-width:110px;
+}
+#pendingList{
+    list-style:none;
+    margin:14px 0 0 0;
+    padding:0;
+    width:90%;
+    max-width:500px;
+    max-height:160px;
+    overflow-y:auto;
+    font-family:monospace;
+    font-size:16px;
+    text-align:center;
+}
+#pendingList li{
+    padding:4px;
+    color:#555;
+}
+#pendingList li.err{
+    color:#c62828;
+    font-weight:bold;
 }
 </style>
 </head>
 <body>
 
-<div id="status"></div>
+<div id="status" aria-live="polite"></div>
 
-<input
-    id="num"
-    type="number"
-    inputmode="numeric"
-    autocomplete="off"
-    autofocus
-    placeholder="N°">
+<form id="form" autocomplete="off">
+    <input
+        id="num"
+        type="text"
+        inputmode="numeric"
+        pattern="[0-9]*"
+        autocomplete="off"
+        autofocus
+        enterkeyhint="send"
+        placeholder="N°">
+</form>
+
+<div id="syncBar">
+    <button id="syncBtn" type="button" disabled>Synchroniser</button>
+    <span id="pendingCount">0 en attente</span>
+</div>
+
+<ul id="pendingList"></ul>
 
 <script type="module">
 
@@ -72,8 +135,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+const form = document.getElementById("form");
 const input = document.getElementById("num");
 const status = document.getElementById("status");
+const syncBtn = document.getElementById("syncBtn");
+const pendingCountEl = document.getElementById("pendingCount");
+const pendingListEl = document.getElementById("pendingList");
 
 function unixToExcelSerial(timestampMs) {
     const msPerDay = 86400000;
@@ -81,48 +148,137 @@ function unixToExcelSerial(timestampMs) {
     return (timestampMs / msPerDay) + excelEpochOffset;
 }
 
-async function envoyer() {
-
-    const valeur = input.value.trim();
-
-    if (!valeur) return;
-
-    const excelTime = unixToExcelSerial(Date.now());
-
-    try {
-
-        await set(
-            ref(db, "saisie/" + valeur),
-            excelTime
-        );
-
-        status.textContent = "✔ Envoyé";
-        input.value = "";
-        input.focus();
-
-        setTimeout(() => {
+function showStatus(text, cls, ttl = 700) {
+    status.textContent = text;
+    status.className = cls;
+    if (ttl) {
+        clearTimeout(showStatus._t);
+        showStatus._t = setTimeout(() => {
             status.textContent = "";
-        }, 500);
-
-    } catch(e) {
-        status.textContent = "❌ Erreur";
-        console.error(e);
+            status.className = "";
+        }, ttl);
     }
 }
 
-input.addEventListener("keydown", e => {
-    if (e.key === "Enter") {
-        envoyer();
+// --- Tampon local, persisté dans localStorage pour survivre à un rechargement/plantage ---
+const STORAGE_KEY = "saisie-rapide-tampon";
+
+function chargerTampon() {
+    try {
+        const brut = localStorage.getItem(STORAGE_KEY);
+        return brut ? JSON.parse(brut) : [];
+    } catch (e) {
+        console.error("Lecture tampon impossible :", e);
+        return [];
     }
-});
+}
 
-window.addEventListener("load", () => {
-    input.focus();
-});
+function sauvegarderTampon() {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(buffer));
+    } catch (e) {
+        console.error("Sauvegarde tampon impossible :", e);
+    }
+}
 
-document.addEventListener("click", () => {
+let buffer = chargerTampon();   // { id, valeur, excelTime, error }
+let syncing = false;
+
+function nouvelId() {
+    return crypto.randomUUID ? crypto.randomUUID() : Date.now() + "-" + Math.random();
+}
+
+function renderBuffer() {
+    pendingCountEl.textContent = buffer.length + " en attente";
+    syncBtn.disabled = syncing || buffer.length === 0;
+    pendingListEl.innerHTML = buffer
+        .slice()
+        .reverse()
+        .map(e => `<li class="${e.error ? "err" : ""}">${e.valeur}${e.error ? " ⚠" : ""}</li>`)
+        .join("");
+    sauvegarderTampon();
+}
+
+// Empêche d'ajouter deux fois la même valeur en rafale (rebond clavier / double tap)
+let dernierAjout = { valeur: null, t: 0 };
+
+function envoyer(e) {
+    if (e) e.preventDefault();
+
+    const valeur = input.value.trim();
+    if (!valeur) return;
+
+    const maintenant = Date.now();
+    if (valeur === dernierAjout.valeur && maintenant - dernierAjout.t < 400) {
+        return; // doublon quasi-instantané, on ignore
+    }
+    dernierAjout = { valeur, t: maintenant };
+
+    // --- Ajout 100% local, instantané, aucun appel réseau ici ---
+    buffer.push({
+        id: nouvelId(),
+        valeur,
+        excelTime: unixToExcelSerial(maintenant),
+        error: false
+    });
+
+    input.value = "";
+    input.classList.remove("err");
+    showStatus("✔ Ajouté", "ok");
     input.focus();
-});
+    renderBuffer();
+}
+
+async function synchroniser() {
+    if (syncing || buffer.length === 0) return;
+
+    syncing = true;
+    syncBtn.textContent = "Synchronisation…";
+    renderBuffer();
+
+    const aEnvoyer = [...buffer]; // instantané du tampon au moment du clic
+    const resultats = await Promise.allSettled(
+        aEnvoyer.map(entree =>
+            set(ref(db, "saisie/" + entree.valeur), entree.excelTime).then(() => entree.id)
+        )
+    );
+
+    const idsReussis = new Set(
+        resultats.filter(r => r.status === "fulfilled").map(r => r.value)
+    );
+    const idsTentes = new Set(aEnvoyer.map(e => e.id));
+
+    // On retire ce qui a réussi, on marque en erreur ce qui a échoué,
+    // et on laisse intact ce qui a été ajouté pendant la synchro.
+    buffer = buffer
+        .filter(e => !idsReussis.has(e.id))
+        .map(e => idsTentes.has(e.id) ? { ...e, error: true } : e);
+
+    const nbReussis = idsReussis.size;
+    const nbEchecs = aEnvoyer.length - nbReussis;
+
+    if (nbEchecs === 0) {
+        showStatus(`✔ ${nbReussis} synchronisé(s)`, "ok");
+    } else {
+        showStatus(`⚠ ${nbReussis} synchronisé(s), ${nbEchecs} en erreur`, "err", 0);
+    }
+
+    syncing = false;
+    syncBtn.textContent = "Synchroniser";
+    renderBuffer();
+}
+
+form.addEventListener("submit", envoyer);
+syncBtn.addEventListener("click", synchroniser);
+
+// État initial : affiche le tampon restauré (le cas échéant) et son décompte
+if (buffer.length > 0) {
+    showStatus(`↻ ${buffer.length} entrée(s) restaurée(s) — à synchroniser`, "err", 0);
+}
+renderBuffer();
+
+window.addEventListener("load", () => input.focus());
+document.addEventListener("click", () => input.focus());
 
 </script>
 
