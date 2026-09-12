@@ -226,25 +226,19 @@ function normalizeCourse(course) {
     }
 }
 
-function excelFractionToMs(excelValue) {
-    return (Number(excelValue) % 1) * 86400000;
+function getTimeFraction(excelValue) {
+    const value = Number(excelValue);
+    if (!Number.isFinite(value)) {return NaN;}
+    return value % 1;
 }
 
-function formatTime(ms) {
-
-    const totalSeconds = Math.floor(ms / 1000);
-
+function formatTime(fraction) {
+    if (!Number.isFinite(fraction)) {return '';}
+    const totalSeconds = Math.round(fraction * 86400);
     const hours = Math.floor(totalSeconds / 3600);
-
-    const minutes = Math.floor(
-        (totalSeconds % 3600) / 60
-    );
-
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
-
-    return `${hours.toString().padStart(2,'0')}:${minutes
-        .toString().padStart(2,'0')}:${seconds
-        .toString().padStart(2,'0')}`;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
 function getRanking(courseFilter, categoryFilter, genderFilter) {
@@ -267,7 +261,7 @@ function getRanking(courseFilter, categoryFilter, genderFilter) {
                 categorie: participant.categorie || '',
                 genre: participant.genre || '',
                 course: normalizeCourse(participant.course),
-                tempsMs: excelFractionToMs(excelValue)
+                temps: getTimeFraction(excelValue)
             };
         })
 
@@ -292,14 +286,14 @@ function getRanking(courseFilter, categoryFilter, genderFilter) {
                    genderOK;
         })
 
-        .sort((a,b) => a.tempsMs - b.tempsMs)
+        .sort((a, b) => a.temps - b.temps)
 
         .slice(0,3)
 
         .map(item => ({
             ...item,
             tempsStr: formatTime(
-                item.tempsMs
+            item.temps
             )
         }));
 }
