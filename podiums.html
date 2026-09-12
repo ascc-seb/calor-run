@@ -454,61 +454,35 @@ function normalizeCourse(course) {
    comme temps du participant.
    ========================================================= */
 
-function getTimeFraction(firebaseValue) {
-
-    const value = Number(firebaseValue);
+function getTimeFraction(excelValue) {
+    const value = Number(excelValue);
 
     if (!Number.isFinite(value)) {
         return NaN;
     }
 
-    return value % 1;
-
+    // On conserve uniquement la partie heure de la date Excel
+    return value - Math.floor(value);
 }
 
 
-/* =========================================================
-   FORMATAGE DU TEMPS
-   =========================================================
-   
-   Ici, on ne détermine PAS le temps du participant.
-   
-   On prend uniquement la fraction déjà récupérée
-   avec % 1 et on la convertit en affichage HH:MM:SS.
-   ========================================================= */
-
 function formatTime(fraction) {
-
     if (!Number.isFinite(fraction)) {
         return '';
     }
 
-    let totalSeconds =
-        Math.round(fraction * 86400);
+    // Conversion de la fraction d'une journée Excel en secondes
+    const totalSeconds = Math.round(fraction * 24 * 60 * 60);
 
-    /*
-     * Sécurité pour éviter un affichage 24:00:00
-     * en cas de valeur extrêmement proche de 1.
-     */
-    totalSeconds = totalSeconds % 86400;
+    const hours = Math.floor(totalSeconds / 3600);
 
-    const hours =
-        Math.floor(totalSeconds / 3600);
-
-    const minutes =
-        Math.floor((totalSeconds % 3600) / 60);
-
-    const seconds =
-        totalSeconds % 60;
-
-    return (
-        String(hours).padStart(2, '0') +
-        ':' +
-        String(minutes).padStart(2, '0') +
-        ':' +
-        String(seconds).padStart(2, '0')
+    const minutes = Math.floor(
+        (totalSeconds % 3600) / 60
     );
 
+    const seconds = totalSeconds % 60;
+
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
 
