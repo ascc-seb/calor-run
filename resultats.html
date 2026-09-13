@@ -165,7 +165,6 @@ if (distanceParam === '10' || distanceParam === '20') {
 }
 
 const db = {
-  depart: firebase.database().ref('data/depart_course'),
   participants: firebase.database().ref('participants'),
   scans: firebase.database().ref('live_scratch')
 };
@@ -177,32 +176,22 @@ const el = {
   counter: document.getElementById('counter')
 };
 
-let participants = {}, scans = {}, departure = null;
+let participants = {}, scans = {};
 const tableRows = new Map();
 
-// === Formatage du temps ===
-const formatTime = ms => {
-  const s = Math.floor(ms/1000);
-  const h = Math.floor(s/3600);
-  const m = Math.floor((s%3600)/60);
-  const sec = s%60;
-  return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
-};
-
-// === Conversion date Excel/Firebase vers timestamp ===
-const excelDateToMs = excelDate => {return Math.round((excelDate - 25569) * 86400 * 1000);};
-  
 // === Rendu du tableau ===
 const render = () => {
-  if (!departure) return;
-  let data = Object.entries(scans).map(([dossard, scanDate]) => {
+  let data = Object.entries(scans).map(([dossard, value]) => {
     const p = participants[dossard];
     if (!p) return null;
-    if (COURSE_DISTANCE && String(p.course) !== String(COURSE_DISTANCE)) {return null;} // Filtre selon la distance
-    const scanTime = excelDateToMs(Number(scanDate)); // live_scratch contient directement une date Excel
-    const t = scanTime - departure; // Calcul du temps depuis le départ
-    if (t < 0) return null; // Ignore les temps négatifs éventuels
-    return {...p, dossard: dossard, tempsMs: t, tempsStr: formatTime(t)};
+    if (COURSE_DISTANCE && String(p.course) !== String(COURSE_DISTANCE)) {return null;}
+    const temps = Number(value) % 1;
+    if (!Number.isFinite(temps)) return null;
+    return {
+      ...p,
+      dossard,
+      temps
+    };
   }).filter(Boolean);
 
   const total = COURSE_DISTANCE // Nombre total de participants
@@ -219,8 +208,7 @@ const render = () => {
   if (activeLink && COURSE_DISTANCE) {activeLink.classList.add("active");}
 
   // Tri par temps
-  data.sort((a, b) => a.tempsMs - b.tempsMs);
-
+  data.sort((a, b) => a.temps - b.temps);
   // Classements
   const classementGenre = {};
   const classementCat = {};
@@ -265,7 +253,7 @@ tr.innerHTML = `
   <td class="text-center">${p.dossard}</td>
   <td>${p.nom || ''}</td>
   <td>${p.prenom || ''}</td>
-  <td class="text-center">${p.tempsStr}</td>
+  <td class="text-center">${p.temps}</td>
   <td class="text-center">${p.genre || ''}</td>
   <td class="text-center">${p.posGenre}</td>
   <td class="text-center">${p.categorie || ''}</td>
@@ -291,7 +279,6 @@ const safeListener = (ref, callback) => {
     try{ callback(snapshot); } catch(err){ console.error('Erreur Firebase :', err); }
   });
 };
-safeListener(db.depart, snap => { departure = snap.exists()?new Date(snap.val()).getTime():null; render(); });
 safeListener(db.participants, snap => { participants = snap.val()||{}; render(); });
 safeListener(db.scans, snap => { scans = snap.val()||{}; render(); });
 </script>
