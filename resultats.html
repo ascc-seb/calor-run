@@ -67,8 +67,8 @@ body::before {
 #counter {
   font-weight: normal;
   color: #000;
-  margin:0 0.25rem; /*utile?*/
-  white-space: nowrap; /*utile?*/
+  margin:0 0.25rem;
+  white-space: nowrap;
 }
 #counter a {
   text-decoration: none;
@@ -92,7 +92,7 @@ th, td { padding:0.375rem 0.5rem; border-bottom:1px solid var(--border-light); t
 th { background: var(--header-bg); font-weight:600; position:sticky; top:0; z-index:10; }
 tbody tr:nth-child(even){ background: var(--bg-light); }
 .text-center { text-align:center; }
-.loading { text-align:center; padding:1.25rem 0; font-size:1rem; }
+.loading, .no-result { text-align:center; padding:1.25rem 0; font-size:1rem; }
 .hidden { display:none; }
 @media(max-width:768px){
   .header { margin-bottom:0.625rem; padding:0rem 0rem 1.5rem; font-size:1rem; }
@@ -109,7 +109,7 @@ tbody tr:nth-child(even){ background: var(--bg-light); }
   <div class="header" id="header-title"></div>
   <div class="search-counter-container">
     <input type="text" id="search" placeholder="Recherche par Nom, prénom, cat. (ex: HM1)" autocomplete="off" aria-label="Recherche par Nom, prénom ou catégorie">
-    <div id="counter"><a href="distance=10">10 km</a> • <a href="distance=20">20 km</a> • Arrivées : 0/0</div>
+    <div id="counter"><a href="?distance=10">10 km</a> • <a href="?distance=20">20 km</a> • Arrivées : 0/0</div>
   </div>
 </div>
 
@@ -137,16 +137,17 @@ tbody tr:nth-child(even){ background: var(--bg-light); }
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <script>
+'use strict';
 
 const FIREBASE_CONFIG = {
-    apiKey: "AIzaSyAIAAz51gEGKQd0EoqA3yUhvnqw3DkQiIo",
-    authDomain: "calor-run.firebaseapp.com",
-    databaseURL: "https://calor-run-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "calor-run",
-    storageBucket: "calor-run.firebasestorage.app",
-    messagingSenderId: "329949291334",
-    appId: "1:329949291334:web:c71ef20268c609cf953b47",
-    measurementId: "G-YVQPW6JGPK"
+  apiKey: "AIzaSyAIAAz51gEGKQd0EoqA3yUhvnqw3DkQiIo",
+  authDomain: "calor-run.firebaseapp.com",
+  databaseURL: "https://calor-run-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "calor-run",
+  storageBucket: "calor-run.firebasestorage.app",
+  messagingSenderId: "329949291334",
+  appId: "1:329949291334:web:c71ef20268c609cf953b47",
+  measurementId: "G-YVQPW6JGPK"
 };
 firebase.initializeApp(FIREBASE_CONFIG);
 
@@ -166,7 +167,7 @@ if (distanceParam === '10' || distanceParam === '20') {
 
 const db = {
   participants: firebase.database().ref('participants'),
-  scans: firebase.database().ref('live_scratch')
+  live_scratch: firebase.database().ref('live_scratch')
 };
 
 const el = {
@@ -176,115 +177,126 @@ const el = {
   counter: document.getElementById('counter')
 };
 
-let participants = {}, scans = {};
-const tableRows = new Map();
+let participants = {};
+let live_scratch = {};
+let searchTerm = '';
 
+// Convertit une valeur Excel (fraction de jour) en "HH:MM:SS"
 const formatExcelTime = value => {
-  let totalSeconds = Math.round((Number(value) % 1) * 86400);
-  totalSeconds %= 86400;
+  const totalSeconds = Math.round((Number(value) % 1) * 86400);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
   return [hours, minutes, seconds]
-    .map(number => String(number).padStart(2, '0'))
+    .map(n => String(n).padStart(2, '0'))
     .join(':');
 };
-  
-// === Rendu du tableau ===
-const render = () => {
-  let data = Object.entries(scans).map(([dossard, value]) => {
+
+// Échappement basique pour éviter toute casse d'affichage si un champ contient < > & " '
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+}[ch]));
+
+// === Calcul du classement complet (dépend de participants + live_scratch) ===
+const computeRanking = () => {
+  const data = Object.entries(live_scratch).map(([dossard, value]) => {
     const p = participants[dossard];
     if (!p) return null;
-    if (COURSE_DISTANCE && String(p.course) !== String(COURSE_DISTANCE)) {return null;}
+    if (COURSE_DISTANCE && String(p.course) !== String(COURSE_DISTANCE)) return null;
     const temps = Number(value) % 1;
     if (!Number.isFinite(temps)) return null;
-    return {
-      ...p,
-      dossard,
-      temps,
-      tempsStr: formatExcelTime(value)
-    };
+    return { ...p, dossard, temps, tempsStr: formatExcelTime(value) };
   }).filter(Boolean);
 
-  const total = COURSE_DISTANCE // Nombre total de participants
-    ? Object.values(participants)
-    .filter(p => String(p.course) === String(COURSE_DISTANCE))
-    .length
-    : Object.values(participants).length;
-
-  // Compteur
-  el.counter.innerHTML = `<a href="?distance=10">10 km</a> • <a href="?distance=20">20 km</a> • Arrivées : ${data.length}/${total}`;
-
-  // Distance active
-  const activeLink = el.counter.querySelector('a[href="?distance=' + COURSE_DISTANCE + '"]');
-  if (activeLink && COURSE_DISTANCE) {activeLink.classList.add("active");}
-
-  // Tri par temps
   data.sort((a, b) => a.temps - b.temps);
-  // Classements
+
   const classementGenre = {};
   const classementCat = {};
   data.forEach((p, i) => {
+    p.scratch = i + 1;
+    classementGenre[p.genre] = (classementGenre[p.genre] || 0) + 1;
+    p.posGenre = classementGenre[p.genre];
+    const catKey = `${p.genre}_${p.categorie}`;
+    classementCat[catKey] = (classementCat[catKey] || 0) + 1;
+    p.posCat = classementCat[catKey];
+  });
 
-// Scratch général
-p.scratch = i + 1;
+  return data;
+};
 
+// === Rendu du tableau (classement déjà calculé, filtré par recherche) ===
+const render = () => {
+  const total = COURSE_DISTANCE
+    ? Object.values(participants).filter(p => String(p.course) === String(COURSE_DISTANCE)).length
+    : Object.values(participants).length;
 
-// Classement par genre
-classementGenre[p.genre] =
-  (classementGenre[p.genre] || 0) + 1;
+  const ranking = computeRanking();
 
-p.posGenre = classementGenre[p.genre];
+  // Compteur
+  el.counter.innerHTML = `<a href="?distance=10">10 km</a> • <a href="?distance=20">20 km</a> • Arrivées : ${ranking.length}/${total}`;
+  const activeLink = el.counter.querySelector(`a[href="?distance=${COURSE_DISTANCE}"]`);
+  if (activeLink && COURSE_DISTANCE) activeLink.classList.add('active');
 
+  // Filtrage par recherche (nom, prénom, catégorie) sans toucher au classement calculé
+  const term = searchTerm.trim().toLowerCase();
+  const visible = term
+    ? ranking.filter(p =>
+        (p.nom || '').toLowerCase().includes(term) ||
+        (p.prenom || '').toLowerCase().includes(term) ||
+        (p.categorie || '').toLowerCase().includes(term))
+    : ranking;
 
-// Classement par catégorie + genre
-const catKey = `${p.genre}_${p.categorie}`;
+  if (visible.length === 0) {
+    el.tbody.innerHTML = `<tr><td colspan="9" class="no-result">Aucun résultat</td></tr>`;
+    el.table.classList.remove('hidden');
+    return;
+  }
 
-classementCat[catKey] =
-  (classementCat[catKey] || 0) + 1;
+  const frag = document.createDocumentFragment();
+  visible.forEach(p => {
+    const tr = document.createElement('tr');
+    if (p.genre === 'F') tr.classList.add('femme');
+    tr.innerHTML = `
+      <td class="text-center">${p.scratch}</td>
+      <td class="text-center">${escapeHtml(p.dossard)}</td>
+      <td>${escapeHtml(p.nom)}</td>
+      <td>${escapeHtml(p.prenom)}</td>
+      <td class="text-center">${p.tempsStr}</td>
+      <td class="text-center">${escapeHtml(p.genre)}</td>
+      <td class="text-center">${p.posGenre}</td>
+      <td class="text-center">${escapeHtml(p.categorie)}</td>
+      <td class="text-center">${p.posCat}</td>
+    `;
+    frag.appendChild(tr);
+  });
 
-p.posCat = classementCat[catKey];
+  el.tbody.innerHTML = '';
+  el.tbody.appendChild(frag);
+  el.table.classList.remove('hidden');
+};
 
-});
-
-// Création du tableau
-tableRows.clear();
-
-const frag = document.createDocumentFragment();
-
-data.forEach(p => {
-
-const tr = document.createElement('tr');
-
-if (p.genre === 'F') {tr.classList.add('femme');}
-tr.innerHTML = `
-  <td class="text-center">${p.scratch}</td>
-  <td class="text-center">${p.dossard}</td>
-  <td>${p.nom || ''}</td>
-  <td>${p.prenom || ''}</td>
-  <td class="text-center">${p.tempsStr}</td>
-  <td class="text-center">${p.genre || ''}</td>
-  <td class="text-center">${p.posGenre}</td>
-  <td class="text-center">${p.categorie || ''}</td>
-  <td class="text-center">${p.posCat}</td>
-`;
-frag.appendChild(tr);
-tableRows.set(tr, tr);
-});
-
-el.tbody.innerHTML = '';
-el.tbody.appendChild(frag);
-el.table.classList.remove('hidden');
+// Évite un double rendu si les deux listeners Firebase se déclenchent au même tick
+let renderScheduled = false;
+const scheduleRender = () => {
+  if (renderScheduled) return;
+  renderScheduled = true;
+  queueMicrotask(() => { renderScheduled = false; render(); });
 };
 
 // === Firebase Listeners sécurisés ===
 const safeListener = (ref, callback) => {
-  ref.on('value', snapshot=>{
-    try{ callback(snapshot); } catch(err){ console.error('Erreur Firebase :', err); }
+  ref.on('value', snapshot => {
+    try { callback(snapshot); } catch (err) { console.error('Erreur Firebase :', err); }
   });
 };
-safeListener(db.participants, snap => { participants = snap.val()||{}; render(); });
-safeListener(db.scans, snap => { scans = snap.val()||{}; render(); });
+safeListener(db.participants, snap => { participants = snap.val() || {}; scheduleRender(); });
+safeListener(db.live_scratch, snap => { live_scratch = snap.val() || {}; scheduleRender(); });
+
+// === Recherche ===
+el.search.addEventListener('input', e => {
+  searchTerm = e.target.value;
+  scheduleRender();
+});
 </script>
 </body>
 </html>
