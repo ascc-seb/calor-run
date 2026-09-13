@@ -179,6 +179,17 @@ const el = {
 let participants = {}, scans = {};
 const tableRows = new Map();
 
+const formatExcelTime = value => {
+  let totalSeconds = Math.round((Number(value) % 1) * 86400);
+  totalSeconds %= 86400;
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds]
+    .map(number => String(number).padStart(2, '0'))
+    .join(':');
+};
+  
 // === Rendu du tableau ===
 const render = () => {
   let data = Object.entries(scans).map(([dossard, value]) => {
@@ -191,6 +202,7 @@ const render = () => {
       ...p,
       dossard,
       temps
+      tempsStr: formatExcelTime(value)
     };
   }).filter(Boolean);
 
@@ -244,32 +256,24 @@ data.forEach(p => {
 
 const tr = document.createElement('tr');
 
-if (p.genre === 'F') {
-  tr.classList.add('femme');
-}
-
+if (p.genre === 'F') {tr.classList.add('femme');}
 tr.innerHTML = `
   <td class="text-center">${p.scratch}</td>
   <td class="text-center">${p.dossard}</td>
   <td>${p.nom || ''}</td>
   <td>${p.prenom || ''}</td>
-  <td class="text-center">${p.temps}</td>
+  <td class="text-center">${p.tempsStr}</td>
   <td class="text-center">${p.genre || ''}</td>
   <td class="text-center">${p.posGenre}</td>
   <td class="text-center">${p.categorie || ''}</td>
   <td class="text-center">${p.posCat}</td>
 `;
-
 frag.appendChild(tr);
-
 tableRows.set(tr, tr);
-
 });
 
 el.tbody.innerHTML = '';
-
 el.tbody.appendChild(frag);
-
 el.table.classList.remove('hidden');
 };
 
