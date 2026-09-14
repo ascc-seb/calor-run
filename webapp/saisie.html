@@ -32,8 +32,8 @@ body{
 #status.err{ color:#c62828; }
 
 #num{
-    width:90%;
-    max-width:500px;
+    width:70%;
+    max-width:300px;
     font-size:48px;
     text-align:center;
     padding:20px;
@@ -42,12 +42,15 @@ body{
     border-radius:8px;
 }
 #num.err{ border-color:#c62828; }
-
 #syncBar{
     display:flex;
     align-items:center;
+    justify-content:center;
     gap:12px;
     margin-top:18px;
+}
+#dangerZone{
+    margin-top:10px;
 }
 #syncBtn{
     font-size:18px;
@@ -64,12 +67,12 @@ body{
 }
 
 #clearDbBtn{
-    font-size:18px;
-    padding:10px 20px;
+    font-size:16px;
+    padding:8px 16px;
     border:none;
     border-radius:6px;
     background:#c62828;
-    color:#fff;
+    color:white;
     cursor:pointer;
 }
 
@@ -105,13 +108,20 @@ body{
 </form>
 
 <div id="syncBar">
-    <button id="syncBtn" type="button" disabled>Synchroniser</button>
-    <button id="clearDbBtn" type="button">Réinitialiser</button>
-    <span id="pendingCount">0 en attente</span>
+    <button id="syncBtn" type="button" disabled>
+        Synchroniser
+    </button>
+    <span id="pendingCount">
+        0 en attente
+    </span>
 </div>
-
+<div style="height:20px;"></div>
+<div id="dangerZone">
+    <button id="clearDbBtn" type="button">
+        🗑 Supprimer les données
+    </button>
+</div>
 <ul id="pendingList"></ul>
-
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
@@ -161,10 +171,10 @@ function showStatus(text, cls, ttl = 700) {
 }
 
 async function viderBase() {
-    const confirmation = confirm("ATTENTION\n\nVous allez supprimer toutes les données de la base.\n\nContinuer ?");
-    if (!confirmation) {return;}
-    const code = prompt("Saisissez le code de sécurité pour confirmer :");
-    if (code !== "0000") {showStatus("Code incorrect", "err", 2000);return;}
+    const confirmation = confirm(
+        "Voulez-vous vraiment supprimer toutes les données ?"
+    );
+    if (!confirmation) return;
     try {
         await remove(ref(db, "saisie"));
         showStatus("🗑 Base supprimée", "ok", 3000);
