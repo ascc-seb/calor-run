@@ -431,7 +431,13 @@ function displayData(classement,count10,count20,total10,total20){
 }
 
 function updateClassement(){
-    if (Object.keys(arrivees).length === 0) {return;}
+    if (Object.keys(arrivees).length === 0) {
+        elements.tbody.innerHTML = '';
+        elements.loading.classList.remove('hidden');
+        elements.compteurs.classList.add('hidden');
+        elements.tableContainer.classList.add('hidden');
+        return;
+    }
     const classement = Object.keys(arrivees).map(dossard => {
         const valeurExcel = Number(arrivees[dossard]);
         const fractionJour = valeurExcel %1;
@@ -475,31 +481,79 @@ function scheduleUpdate(){
     queueMicrotask(() => { updateScheduled = false; updateClassement(); });
 }
 
-db.ref('data/depart_course').on('value', snapshot => {
-    departureTimestamp = snapshot.exists()
-        ? new Date(snapshot.val()).getTime()
-        : null;
-    startChrono();
-});
+// === Firebase Listeners sécurisés ===
+const safeListener = (ref, callback) => {
+    ref.on('value', snapshot => {
+        try {
+            callback(snapshot);
+        } catch (err) {
+            console.error('Erreur Firebase :', err);
+        }
+    });
+};
 
-db.ref('participants').on('value', snapshot => {
-    participants = snapshot.val() || {};
-    scheduleUpdate();
-});
+// Chronomètre
+safeListener(
+    db.ref('data/depart_course'),
+    snapshot => {
+        departureTimestamp = snapshot.exists()
+            ? new Date(snapshot.val()).getTime()
+            : null;
 
+        startChrono();
+    }
+);
+
+// Participants
+safeListener(
+    db.ref('participants'),
+    snapshot => {
+        participants = snapshot.val() || {};
+        scheduleUpdate();
+    }
+);
+
+// Résultats dynamiques selon data/base_ref
 let arriveesRef = null;
 
-db.ref('data/base_ref').on('value', snapshot => {
-    const baseRef = snapshot.val() || 'live_scratch';
-    if (arriveesRef) {arriveesRef.off();}
-    arriveesRef = db.ref(baseRef);
-    arriveesRef.on('value', snap => {
-        arrivees = snap.val() || {};
-        scheduleUpdate();
-    });
-});
+safeListener(
+    db.ref('data/base_ref'),
+    snapshot => {
+        const baseRef = String(
+            snapshot.val() || 'live_scratch'
+        ).trim();
 
-window.addEventListener('beforeunload',()=>{ if(chronoInterval) clearInterval(chronoInterval); });
+        // Désabonnement de l'ancienne source
+        if (arriveesRef) {
+            arriveesRef.off('value');
+        }
+
+        // Réinitialise les arrivées lors du changement de source
+        arrivees = {};
+
+        // Nouvelle source définie dans data/base_ref
+        arriveesRef = db.ref(baseRef);
+
+        safeListener(
+            arriveesRef,
+            dataSnapshot => {
+                arrivees = dataSnapshot.val() || {};
+                scheduleUpdate();
+            }
+        );
+    }
+);
+
+// Nettoyage à la fermeture de la page
+window.addEventListener('beforeunload', () => {
+    if (chronoInterval) {
+        clearInterval(chronoInterval);
+    }
+
+    if (arriveesRef) {
+        arriveesRef.off('value');
+    }
+});
 </script>
 </body>
 </html>
