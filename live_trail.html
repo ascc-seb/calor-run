@@ -500,9 +500,16 @@ db.ref('participants').on('value', snapshot => {
     scheduleUpdate();
 });
 
-db.ref('live_scratch').on('value', snapshot => {
-    arrivees = snapshot.val() || {};
-    scheduleUpdate();
+let arriveesRef = null;
+
+db.ref('data/base_ref').on('value', snapshot => {
+    const baseRef = snapshot.val() || 'live_scratch';
+    if (arriveesRef) {arriveesRef.off();}
+    arriveesRef = db.ref(baseRef);
+    arriveesRef.on('value', snap => {
+        arrivees = snap.val() || {};
+        scheduleUpdate();
+    });
 });
 
 window.addEventListener('beforeunload',()=>{ if(chronoInterval) clearInterval(chronoInterval); });
