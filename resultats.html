@@ -43,14 +43,17 @@ body::before {
   font-weight:bold;
   padding:0;
 }
-    .header-title {
-      position:absolute;
-      top:30%;
-      left:50%;
-      transform:translate(-50%, -50%);
-      z-index:2;
-      text-shadow: 0 0 6px rgba(255,255,255,0.85), 0 0 3px rgba(255,255,255,0.85);
-    }
+.svg-wrapper {
+  position:relative;
+}
+.header-title {
+  position:absolute;
+  top:30%;
+  left:50%;
+  transform:translate(-50%, -50%);
+  z-index:2;
+  text-shadow: 0 0 6px rgba(255,255,255,0.85), 0 0 3px rgba(255,255,255,0.85);
+}
 .header svg {
   width:100%;
   height:auto;
@@ -137,8 +140,7 @@ tbody tr:nth-child(even){ background: var(--bg-light); }
 .loading, .no-result { text-align:center; padding:1.25rem 0; font-size:1rem; }
 .hidden { display:none; }
 @media(max-width:768px){
-  .header { margin-bottom:0.625rem; padding:0rem 0rem 1.5rem; font-size:1rem; }
-  .header-title { position:absolute; top:20%; }
+  .header { margin-bottom:0.625rem; font-size:1rem; }
   .search-counter-container { justify-content:center; flex-direction:column; gap:0.625rem; margin-bottom:0.625rem; }
   #search, #counter { font-size:0.75rem; text-align: center; width: 100%; padding:0rem; max-width: none; flex: none; }
   table { font-size:0.85rem; }
@@ -148,7 +150,9 @@ tbody tr:nth-child(even){ background: var(--bg-light); }
 </head>
 <body>
 <div class="container">
-  <div class="header" id="header-title"></div>
+  <div class="header">
+    <div class="svg-wrapper">
+      <span class="header-title" id="header-title"></span>
 <svg id="animSVG" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1922 250">
     <defs>
       <radialGradient id="radial-gradient" cx="702.67" cy="-70.04" r="148.32"
@@ -195,8 +199,9 @@ d="M383.17,72.73c0.54,0.16,1.06,0.31,2.56,0.75c-0.19,0.32-0.44,0.94-0.57,0.91c-0
     <polyline id="trail" class="trail" points=""/>
     <circle id="pulse" class="pulse" r="4"/>
     <circle id="halo" class="halo" r="8"/>
-</svg>      
-    </div> 
+</svg>
+    </div>
+  </div>
   <div class="search-counter-container">
     <input type="text" id="search" placeholder="Recherche par Nom, prénom, cat. (ex: HM1)" autocomplete="off" aria-label="Recherche par Nom, prénom ou catégorie">
     <div id="counter"><a href="?distance=10">10 km</a> • <a href="?distance=20">20 km</a> • Arrivées : 0/0</div>
