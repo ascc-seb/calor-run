@@ -341,7 +341,7 @@ if (distanceParam === '10' || distanceParam === '20') {
 
 const db = {
   participants: firebase.database().ref('participants'),
-  live_scratch: firebase.database().ref('live_scratch')
+  baseRef: firebase.database().ref('data/base_ref')
 };
 
 const el = {
@@ -463,8 +463,17 @@ const safeListener = (ref, callback) => {
     try { callback(snapshot); } catch (err) { console.error('Erreur Firebase :', err); }
   });
 };
+
 safeListener(db.participants, snap => { participants = snap.val() || {}; scheduleRender(); });
-safeListener(db.live_scratch, snap => { live_scratch = snap.val() || {}; scheduleRender(); });
+
+let liveScratchRef = null;
+
+safeListener(db.baseRef, snap => {
+  const baseRef = snap.val() || 'live_scratch';
+  if (liveScratchRef) { liveScratchRef.off(); }
+  liveScratchRef = firebase.database().ref(baseRef);
+  safeListener(liveScratchRef, dataSnap => { live_scratch = dataSnap.val() || {}; scheduleRender(); });
+  });
 
 // === Recherche ===
 el.search.addEventListener('input', e => {
