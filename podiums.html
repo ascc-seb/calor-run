@@ -135,7 +135,7 @@ tbody tr:nth-child(even){ background: var(--bg-light); }
 }
 
 @media (max-width: 768px) {
-  .header { margin-bottom:0.625rem; padding:0rem 0rem 1.5rem; font-size:0.75rem; }
+  .header { margin-bottom:0.625rem; font-size:0.75rem; }
   table { width: auto; font-size:0.85rem; }
   th, td { padding:0.375rem 0.5rem; }
 }
@@ -256,7 +256,6 @@ d="M383.17,72.73c0.54,0.16,1.06,0.31,2.56,0.75c-0.19,0.32-0.44,0.94-0.57,0.91c-0
   </div>
 
   <div id="loading" class="loading">Connexion...</div>
-</div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -617,6 +616,10 @@ function populateCategories() {
 
 // === Firebase Listeners sécurisés ===
 const safeListener = (ref, callback) => {
+    if (!ref || typeof ref.on !== 'function') {
+        console.error('safeListener: référence Firebase invalide', ref);
+        return;
+    }
     ref.on('value', snapshot => {
         try {
             callback(snapshot);
