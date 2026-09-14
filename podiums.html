@@ -227,42 +227,30 @@ function normalizeCourse(course) {
 }
 
 function excelFractionToMs(excelValue) {
-
     const fraction = Number(excelValue) % 1;
-
     return fraction * 24 * 60 * 60 * 1000;
 }
 
 function formatTime(ms) {
-
     const totalSeconds = Math.floor(ms / 1000);
-
     const hours = Math.floor(totalSeconds / 3600);
-
     const minutes = Math.floor(
         (totalSeconds % 3600) / 60
     );
-
     const seconds = totalSeconds % 60;
-
     return `${hours.toString().padStart(2,'0')}:${minutes
         .toString().padStart(2,'0')}:${seconds
         .toString().padStart(2,'0')}`;
 }
 
 function getRanking(courseFilter, categoryFilter, genderFilter) {
-
     return Object.entries(liveScratch)
-
         .map(([dossard, excelValue]) => {
-
             const participant =
                 participants[dossard];
-
             if (!participant) {
                 return null;
             }
-
             return {
                 dossard,
                 nom: participant.nom || '',
@@ -273,32 +261,23 @@ function getRanking(courseFilter, categoryFilter, genderFilter) {
                 tempsMs: excelFractionToMs(excelValue)
             };
         })
-
         .filter(Boolean)
-
         .filter(item => {
-
             const courseOK =
                 !courseFilter ||
                 item.course === courseFilter;
-
             const categoryOK =
                 !categoryFilter ||
                 item.categorie === categoryFilter;
-
             const genderOK =
                 !genderFilter ||
                 item.genre === genderFilter;
-
             return courseOK &&
                    categoryOK &&
                    genderOK;
         })
-
         .sort((a,b) => a.tempsMs - b.tempsMs)
-
         .slice(0,3)
-
         .map(item => ({
             ...item,
             tempsStr: formatTime(
@@ -308,24 +287,17 @@ function getRanking(courseFilter, categoryFilter, genderFilter) {
 }
 
 // Classement des 3 clubs les plus représentés (toutes courses confondues),
-// avec le nombre total d'inscrits et le nombre total de km parcourus par le club
 function getClubRanking() {
-
     const clubs = {};
-
     Object.values(participants)
         .forEach(p => {
-
             const clubName =
                 (p.club || '').trim();
-
             if (!clubName) {
                 return;
             }
-
             const course =
                 normalizeCourse(p.course);
-
             const km =
                 COURSE_KM[course] || 0;
 
@@ -336,31 +308,23 @@ function getClubRanking() {
                     km: 0
                 };
             }
-
             clubs[clubName].inscrits += 1;
             clubs[clubName].km += km;
         });
-
     return Object.values(clubs)
         .sort((a,b) => b.inscrits - a.inscrits)
         .slice(0,3);
 }
 
 function renderTable(tbody, classement, femme = false) {
-
     tbody.innerHTML = '';
-
     const podiums = femme
         ? ['🥇 1ère','🥈 2ème','🥉 3ème']
         : ['🥇 1er','🥈 2ème','🥉 3ème'];
-
     for(let i = 0 ; i < 3 ; i++) {
-
         const p = classement[i];
-
         const tr =
             document.createElement('tr');
-
         tr.innerHTML = `
             <td>${podiums[i]}</td>
             <td>${p ? p.nom : ''}</td>
@@ -368,60 +332,47 @@ function renderTable(tbody, classement, femme = false) {
             <td>${p ? p.tempsStr : ''}</td>
             <td>${p ? p.categorie : ''}</td>
         `;
-
         tbody.appendChild(tr);
     }
 }
 
 function renderClubTable(tbody, classement) {
-
     tbody.innerHTML = '';
-
     const podiums = ['🥇 1er','🥈 2ème','🥉 3ème'];
-
     for(let i = 0 ; i < 3 ; i++) {
-
         const c = classement[i];
-
         const tr =
             document.createElement('tr');
-
         tr.innerHTML = `
             <td>${podiums[i]}</td>
             <td>${c ? c.club : ''}</td>
             <td>${c ? c.inscrits : ''}</td>
             <td>${c ? c.km : ''}</td>
         `;
-
         tbody.appendChild(tr);
     }
 }
 
 function updateTables() {
-
     const categoryFilter =
         elements.filterCat.value;
-
     const podiumHommes =
         getRanking(
             selectedCourse,
             categoryFilter,
             'H'
         );
-
     const podiumFemmes =
         getRanking(
             selectedCourse,
             categoryFilter,
             'F'
         );
-
     renderTable(
         elements.tableHomme,
         podiumHommes,
         false
     );
-
     renderTable(
         elements.tableFemme,
         podiumFemmes,
@@ -430,7 +381,6 @@ function updateTables() {
 }
 
 function updateClubTable() {
-
     renderClubTable(
         elements.tableClubs,
         getClubRanking()
@@ -438,92 +388,83 @@ function updateClubTable() {
 }
 
 function populateCategories() {
-
     const categories = new Set();
-
     Object.values(participants)
         .forEach(p => {
-
             if(p.categorie) {
                 categories.add(
                     p.categorie
                 );
             }
         });
-
     const sorted =
         [...categories].sort((a,b) => {
-
             const order = {
                 CA: 1,
                 JU: 2,
                 ES: 3,
                 SE: 4
             };
-
             const aMaster =
                 /^M\d+$/.test(a);
-
             const bMaster =
                 /^M\d+$/.test(b);
-
             if(aMaster && bMaster) {
-
                 return parseInt(a.slice(1))
                      - parseInt(b.slice(1));
             }
-
             return (order[a] || 999)
                  - (order[b] || 999);
         });
-
     elements.filterCat.innerHTML =
         '<option value="">Toutes catégories</option>';
-
     sorted.forEach(cat => {
-
         const option =
             document.createElement('option');
-
         option.value = cat;
         option.textContent = cat;
-
         elements.filterCat.appendChild(option);
     });
 }
 
-db.ref('participants')
-.on('value', snapshot => {
+// === Firebase Listeners sécurisés ===
+const safeListener = (ref, callback) => {
+  ref.on('value', snapshot => {
+    try { callback(snapshot); } catch (err) { console.error('Erreur Firebase :', err); }
+  });
+};
+safeListener(db.participants, snap => { participants = snap.val() || {}; scheduleRender(); });
+safeListener(db.scans, snap => { scans = snap.val() || {}; scheduleRender(); });
 
-    participants =
-        snapshot.val() || {};
-
-    populateCategories();
-
-    elements.loading.classList.add(
-        'hidden'
-    );
-
-    elements.filterBar.classList.remove(
-        'hidden'
-    );
-
-    elements.tables.classList.remove(
-        'hidden'
-    );
-
-    updateTables();
-    updateClubTable();
+    
+safeListener(
+    db.ref('participants'),
+    snapshot => {
+        participants = snapshot.val() || {};
+        populateCategories();
+        elements.loading.classList.add( 'hidden' );
+        elements.filterBar.classList.remove( 'hidden' );
+        elements.tables.classList.remove( 'hidden' );
+        updateTables();
+        updateClubTable();
 });
 
-db.ref('live_scratch')
-.on('value', snapshot => {
+let liveScratchRef = null;
 
-    liveScratch =
-        snapshot.val() || {};
-
-    updateTables();
-});
+safeListener(
+    db.ref('data/base_ref'),
+    snapshot => {
+        const baseRef =
+            snapshot.val() || 'live_scratch';
+        if (liveScratchRef) { liveScratchRef.off(); }
+        liveScratchRef = db.ref(baseRef);
+        safeListener(
+            liveScratchRef,
+            dataSnapshot => {
+                liveScratch =
+                    dataSnapshot.val() || {};
+                updateTables();
+});});
 
 elements.filterCat
 .addEventListener(
@@ -534,14 +475,11 @@ elements.filterCat
 document
 .querySelectorAll('.filter-course')
 .forEach(link => {
-
     link.addEventListener(
         'click',
         e => {
-
             selectedCourse =
                 e.target.dataset.course;
-
             document
                 .querySelectorAll('.filter-course')
                 .forEach(btn =>
@@ -549,11 +487,9 @@ document
                         'active'
                     )
                 );
-
             e.target.classList.add(
                 'active'
             );
-
             updateTables();
         }
     );
