@@ -39,6 +39,7 @@ body::before {
 }
 .container { max-width: var(--max-width); margin: 0 auto; }
 .header {
+  position:relative;
   text-align:center;
   margin-bottom:0.625rem;
   color: var(--primary-color);
@@ -82,9 +83,15 @@ body::before {
 .coeur_gauche { fill:#f0047f; }
 .coeur_droit { fill:url(#radial-gradient); }
 .chrono-time {
+    position:absolute;
+    top:30%;
+    left:50%;
+    transform:translate(-50%, -50%);
+    z-index:2;
     font-family: 'Share Tech Mono', monospace;
     font-variant-numeric: tabular-nums;
     color: var(--primary-color);
+    text-shadow: 0 0 6px rgba(255,255,255,0.85), 0 0 3px rgba(255,255,255,0.85);
 }
 .chrono-time.paused { opacity: 0.7; }
 .counter-line { text-align: center; margin-bottom: 15px; font-size: 1rem; }
@@ -97,7 +104,8 @@ body::before {
 }
 @keyframes blinker { 50% { opacity: 0; } }
 .table-container {
-    max-width: var(--max-width);
+    width: 100%;
+    max-width: 1400px;
     overflow-x: auto;
     margin: 0 auto 1.25rem;
     background: var(--bg-white);
@@ -113,17 +121,20 @@ tbody tr:nth-child(even){ background: var(--bg-light); }
 .hidden { display:none; }
 
 @media (max-width: 768px) {
-    .header { margin-bottom:0.625rem; padding:0rem 0rem 1.5rem; font-size:0.75rem; }
+    .header { margin-bottom:0.625rem; font-size:0.75rem; }
     .counter-line { margin-bottom: 5px; font-size:0.75rem; }
-    table { font-size: 0.85rem; }
+    .table-container { width: 100%; overflow-x: auto; }
+    table { width: auto; font-size: 0.85rem; }
     th, td { padding:0.375rem 0.5rem; }
-}
+    .chrono-time { top:20%; }
 </style>
 </head>
 <body>
 <div class="container">
     <div class="header">
-
+        <div class="chrono-time paused" id="chrono-time">
+            <span id="chrono-text">--:--:--</span>
+        </div>
 <svg id="animSVG" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1922 250">
     <defs>
       <radialGradient id="radial-gradient" cx="702.67" cy="-70.04" r="148.32"
@@ -171,10 +182,6 @@ d="M383.17,72.73c0.54,0.16,1.06,0.31,2.56,0.75c-0.19,0.32-0.44,0.94-0.57,0.91c-0
     <circle id="pulse" class="pulse" r="4"/>
     <circle id="halo" class="halo" r="8"/>
 </svg>
-
-        <div class="chrono-time paused" id="chrono-time">
-            <span id="chrono-text">--:--:--</span>
-        </div>
     </div>
     <div id="loading" class="loading"> ⌛ Course en cours ...</div>
         <div id="compteurs" class="counter-line hidden">
@@ -183,26 +190,6 @@ d="M383.17,72.73c0.54,0.16,1.06,0.31,2.56,0.75c-0.19,0.32-0.44,0.94-0.57,0.91c-0
         <span class="counter-20km">20 km : 0</span>
         <span> • </span>
         <span class="counter-total">Total : 0</span>
-    </div>
-
-    <div class="table-container hidden" id="table-container">
-        <table id="classement">
-            <thead>
-                <tr>
-                    <th class="text-center">Dossard</th>
-                    <th>Nom</th>
-                    <th>Prénom</th>
-                    <th class="text-center">Temps</th>
-                    <th class="text-center">Course</th>
-                    <th class="text-center">Scratch</th>
-                    <th class="text-center">Genre</th>
-                    <th class="text-center">Pos. Genre</th>
-                    <th class="text-center">CAT</th>
-                    <th class="text-center">Pos. CAT</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
     </div>
 </div>
 <div class="table-container hidden" id="table-container">
