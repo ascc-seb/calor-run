@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
@@ -37,20 +37,19 @@
     }
     .container { max-width: var(--max-width); margin:0 auto; }
     .header {
-      position:relative;
-      text-align:center;
-      margin-bottom:0.625rem;
+      text-align: center;
+      margin-bottom: 0.625rem;
       color: var(--primary-color);
-      font-size:1.5rem;
-      font-weight:bold;
-      padding:0;
+      font-size: 1.5rem;
+      font-weight: bold;
     }
+    .svg-wrapper { position: relative; }
     .header-title {
-      position:absolute;
-      top:30%;
-      left:50%;
-      transform:translate(-50%, -50%);
-      z-index:2;
+      position: absolute;
+      top: 30%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2;
       text-shadow: 0 0 6px rgba(255,255,255,0.85), 0 0 3px rgba(255,255,255,0.85);
     }
     .header svg {
@@ -140,7 +139,7 @@
     .no-results { text-align:center; padding:40px; color:#666; font-style:italic; }
     @media(max-width:768px){
       .header { margin-bottom:0.625rem; font-size:1rem; }
-      .header-title { top:30%; }
+      .svg-wrapper { margin-bottom: 1.5rem; }
       .search-counter-container { display:block !important; margin-bottom:0.625rem; }
       #search, #counter { display:block !important; font-size:0.75rem; text-align:center; width:100% !important; padding:0; max-width:none; margin:0 0 0.625rem; white-space:normal; }
       #counter { margin-bottom:0; }
@@ -151,7 +150,8 @@
 </head>
 <body>
   <div class="container">
-    <div class="header"><span class="header-title">PARTICIPANTS</span>
+<div class="svg-wrapper">
+<div class="header"><span class="header-title">PARTICIPANTS</span>
 <svg id="animSVG" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1922 250">
     <defs>
       <radialGradient id="radial-gradient" cx="702.67" cy="-70.04" r="148.32"
@@ -198,8 +198,9 @@ d="M383.17,72.73c0.54,0.16,1.06,0.31,2.56,0.75c-0.19,0.32-0.44,0.94-0.57,0.91c-0
     <polyline id="trail" class="trail" points=""/>
     <circle id="pulse" class="pulse" r="4"/>
     <circle id="halo" class="halo" r="8"/>
-</svg>      
-    </div>
+</svg>
+</div>
+</div>
     <div class="search-counter-container">
       <input type="text" id="search" placeholder="Rechercher par nom, prénom, club ou catégorie (ex: HM0, FSE)" autocomplete="off">
       <div id="counter">
