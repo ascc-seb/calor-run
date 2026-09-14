@@ -1,6 +1,6 @@
-// Animation partagée du logo SVG (ECG + silhouette coureur) — Calor Run
-
 'use strict';
+// Animation partagée du logo SVG (ECG + silhouette coureur) — Calor Run
+// Utilisé par : live_trail.html, participants.html, podiums.html, resultats.html, statistiques.html
 
 const CONFIG = {
     ecg: { speed: 2, trailLength: 25, sampleStep: 1 },
