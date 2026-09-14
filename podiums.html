@@ -429,42 +429,59 @@ function populateCategories() {
 
 // === Firebase Listeners sécurisés ===
 const safeListener = (ref, callback) => {
-  ref.on('value', snapshot => {
-    try { callback(snapshot); } catch (err) { console.error('Erreur Firebase :', err); }
-  });
+    ref.on('value', snapshot => {
+        try {
+            callback(snapshot);
+        } catch (err) {
+            console.error('Erreur Firebase :', err);
+        }
+    });
 };
-safeListener(db.participants, snap => { participants = snap.val() || {}; scheduleRender(); });
-safeListener(db.scans, snap => { scans = snap.val() || {}; scheduleRender(); });
 
-    
+// Participants
 safeListener(
     db.ref('participants'),
     snapshot => {
         participants = snapshot.val() || {};
+
         populateCategories();
-        elements.loading.classList.add( 'hidden' );
-        elements.filterBar.classList.remove( 'hidden' );
-        elements.tables.classList.remove( 'hidden' );
+
+        elements.loading.classList.add('hidden');
+        elements.filterBar.classList.remove('hidden');
+        elements.tables.classList.remove('hidden');
+
         updateTables();
         updateClubTable();
-});
+    }
+);
 
+// Résultats dynamiques selon data/base_ref
 let liveScratchRef = null;
 
 safeListener(
     db.ref('data/base_ref'),
     snapshot => {
-        const baseRef =
-            snapshot.val() || 'live_scratch';
-        if (liveScratchRef) { liveScratchRef.off(); }
+        const baseRef = String(
+            snapshot.val() || 'live_scratch'
+        ).trim();
+
+        // Supprime le listener sur l'ancienne base
+        if (liveScratchRef) {
+            liveScratchRef.off('value');
+        }
+
+        // Écoute la base indiquée dans data/base_ref
         liveScratchRef = db.ref(baseRef);
+
         safeListener(
             liveScratchRef,
             dataSnapshot => {
-                liveScratch =
-                    dataSnapshot.val() || {};
+                liveScratch = dataSnapshot.val() || {};
                 updateTables();
-});});
+            }
+        );
+    }
+);
 
 elements.filterCat
 .addEventListener(
