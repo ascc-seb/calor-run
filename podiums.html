@@ -289,31 +289,47 @@ function getRanking(courseFilter, categoryFilter, genderFilter) {
 // Classement des 3 clubs les plus représentés (toutes courses confondues),
 function getClubRanking() {
     const clubs = {};
-    Object.values(participants)
-        .forEach(p => {
-            const clubName =
-                (p.club || '').trim();
-            if (!clubName) {
-                return;
-            }
-            const course =
-                normalizeCourse(p.course);
-            const km =
-                COURSE_KM[course] || 0;
 
-            if (!clubs[clubName]) {
-                clubs[clubName] = {
-                    club: clubName,
-                    inscrits: 0,
-                    km: 0
-                };
-            }
-            clubs[clubName].inscrits += 1;
-            clubs[clubName].km += km;
-        });
+    Object.values(participants).forEach(p => {
+        const clubName = (p.club || '').trim();
+
+        if (!clubName) {
+            return;
+        }
+
+        const course = normalizeCourse(p.course);
+        const km = COURSE_KM[course] || 0;
+
+        if (!clubs[clubName]) {
+            clubs[clubName] = {
+                club: clubName,
+                inscrits: 0,
+                km: 0
+            };
+        }
+
+        clubs[clubName].inscrits += 1;
+        clubs[clubName].km += km;
+    });
+
     return Object.values(clubs)
-        .sort((a,b) => b.inscrits - a.inscrits)
-        .slice(0,3);
+        .sort((a, b) => {
+            // 1. Nombre d'inscrits décroissant
+            if (b.inscrits !== a.inscrits) {
+                return b.inscrits - a.inscrits;
+            }
+
+            // 2. Kilomètres totaux décroissants
+            if (b.km !== a.km) {
+                return b.km - a.km;
+            }
+
+            // 3. Nom du club par ordre alphabétique
+            return a.club.localeCompare(b.club, 'fr', {
+                sensitivity: 'base'
+            });
+        })
+        .slice(0, 3);
 }
 
 function renderTable(tbody, classement, femme = false) {
