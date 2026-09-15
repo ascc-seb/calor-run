@@ -3,189 +3,196 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="preconnect" href="https://www.gstatic.com">
-<link rel="preconnect" href="https://calor-run-default-rtdb.europe-west1.firebasedatabase.app">
-
 <title>Saisie Rapide</title>
 
 <style>
-body{
-    margin:0;
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
-    align-items:center;
-    height:100vh;
-    background:#f5f5f5;
-    font-family:Arial,sans-serif;
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #f5f5f5;
+    font-family: Arial, sans-serif;
 }
 
-#status{
-    min-height:30px;
-    margin-bottom:15px;
-    text-align:center;
-    font-size:22px;
-    font-weight:bold;
-    color:#222; /* neutre par défaut, piloté par classe */
-}
-#status.ok{ color:#2e7d32; }
-#status.err{ color:#c62828; }
+#app { width: min(90%, 360px); text-align: center; }
 
-#num{
-    width:70%;
-    max-width:300px;
-    font-size:48px;
-    text-align:center;
-    padding:20px;
-    box-sizing:border-box;
-    border:2px solid #ccc;
-    border-radius:8px;
-}
-#num.err{ border-color:#c62828; }
-#syncBar{
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    gap:12px;
-    margin-top:18px;
-}
-#dangerZone{
-    margin-top:10px;
-}
-#syncBtn{
-    font-size:18px;
-    padding:10px 20px;
-    border:none;
-    border-radius:6px;
-    background:#1565c0;
-    color:#fff;
-    cursor:pointer;
-}
-#syncBtn:disabled{
-    background:#9e9e9e;
-    cursor:default;
-}
+/* Message de statut */
+#status { height: 32px; margin-bottom: 12px; font-size: 22px; font-weight: bold; color: #222; }
+#status.ok  { color: #2e7d32; }
+#status.err { color: #c62828; }
 
-#clearDbBtn{
-    font-size:16px;
-    padding:8px 16px;
-    border:none;
-    border-radius:6px;
-    background:#c62828;
-    color:white;
-    cursor:pointer;
+/* Saisie */
+#num {
+    width: 100%;
+    height: 80px;
+    padding: 10px;
+    font-size: 48px;
+    text-align: center;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    outline: none;
 }
+#num.err { border-color: #c62828; }
 
-#clearDbBtn:hover{
-    background:#b71c1c;
+/* Synchronisation */
+#syncBar { margin-top: 15px; }
+#syncBtn {
+    width: 100%;
+    height: 46px;
+    border: none;
+    border-radius: 6px;
+    background: #65c015;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
 }
+#syncBtn:disabled { background: #9e9e9e; cursor: default; }
 
-#pendingCount{
-    font-size:16px;
-    color:#555;
-    min-width:110px;
+#pendingCount { display: block; margin-top: 8px; font-size: 16px; color: #555; }
+
+/* Liste d'attente */
+#pendingList {
+    list-style: none;
+    text-align: left;
+    margin: 12px 0 0;
+    padding: 0;
+    max-height: 160px;
+    overflow-y: auto;
 }
-#pendingList li.err{
-    color:#c62828;
-    font-weight:bold;
+#pendingList li {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 8px;
+    font-size: 14px;
+    color: #555;
+    border-bottom: 1px solid #e0e0e0;
 }
+#pendingList li.err { color: #c62828; font-weight: bold; }
+
+/* Suppression */
+#dangerZone { margin-top: 30px; }
+#clearDbBtn {
+    width: 100%;
+    height: 42px;
+    border: none;
+    border-radius: 6px;
+    background: #c62828;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+}
+#clearDbBtn:hover { background: #b71c1c; }
 </style>
 </head>
+
 <body>
+<div id="app">
+    <div id="status" aria-live="polite"></div>
 
-<div id="status" aria-live="polite"></div>
+    <form id="form" autocomplete="off">
+        <input
+            id="num"
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            autocomplete="off"
+            autofocus
+            enterkeyhint="send"
+            placeholder="N°"
+        >
+    </form>
 
-<form id="form" autocomplete="off">
-    <input
-        id="num"
-        type="text"
-        inputmode="numeric"
-        pattern="[0-9]*"
-        autocomplete="off"
-        autofocus
-        enterkeyhint="send"
-        placeholder="N°">
-</form>
+    <div id="syncBar">
+        <button id="syncBtn" type="button" disabled>Synchroniser</button>
+        <span id="pendingCount">0 en attente</span>
+    </div>
 
-<div id="syncBar">
-    <button id="syncBtn" type="button" disabled>
-        Synchroniser
-    </button>
-    <span id="pendingCount">
-        0 en attente
-    </span>
+    <ul id="pendingList"></ul>
+
+    <div id="dangerZone">
+        <button id="clearDbBtn" type="button">🗑 Supprimer les données</button>
+    </div>
 </div>
-<div style="height:20px;"></div>
-<div id="dangerZone">
-    <button id="clearDbBtn" type="button">
-        🗑 Supprimer les données
-    </button>
-</div>
-<ul id="pendingList"></ul>
+
 <script type="module">
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-import {
-    getDatabase,
-    ref,
-    set,
-    remove
-} from "https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js";
+import { getDatabase, ref, get, set, remove } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAIAAz51gEGKQd0EoqA3yUhvnqw3DkQiIo",
-  authDomain: "calor-run.firebaseapp.com",
-  databaseURL: "https://calor-run-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "calor-run",
-  storageBucket: "calor-run.firebasestorage.app",
-  messagingSenderId: "329949291334",
-  appId: "1:329949291334:web:c71ef20268c609cf953b47",
-  measurementId: "G-YVQPW6JGPK"
+/* =========================================================
+   CONFIGURATION
+   ========================================================= */
+
+const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAIAAz51gEGKQd0EoqA3yUhvnqw3DkQiIo",
+    authDomain: "calor-run.firebaseapp.com",
+    databaseURL: "https://calor-run-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "calor-run",
+    storageBucket: "calor-run.firebasestorage.app",
+    messagingSenderId: "329949291334",
+    appId: "1:329949291334:web:c71ef20268c609cf953b47",
+    measurementId: "G-YVQPW6JGPK"
 };
 
-const app = initializeApp(firebaseConfig);
+const STORAGE_KEY = "saisie-rapide-tampon";
+const RETRY_DEPART_MS = 5000;   // nouvelle tentative si le départ n'a pas pu être chargé
+const AUTO_SYNC_MS = 5000;      // synchronisation automatique en arrière-plan
+const ANTI_REBOND_MS = 400;     // anti double-saisie sur la même valeur
+
+/* =========================================================
+   FIREBASE
+   ========================================================= */
+
+const app = initializeApp(FIREBASE_CONFIG);
 const db = getDatabase(app);
+
+/* =========================================================
+   RÉFÉRENCES DOM
+   ========================================================= */
 
 const form = document.getElementById("form");
 const input = document.getElementById("num");
-const status = document.getElementById("status");
+const statusEl = document.getElementById("status");
 const syncBtn = document.getElementById("syncBtn");
 const pendingCountEl = document.getElementById("pendingCount");
+const pendingListEl = document.getElementById("pendingList");
+const clearDbBtn = document.getElementById("clearDbBtn");
 
-function unixToExcelSerial(timestampMs) {
-    const msPerDay = 86400000;
-    const excelEpochOffset = 25569;
-    return (timestampMs / msPerDay) + excelEpochOffset;
-}
+/* =========================================================
+   ÉTAT
+   ========================================================= */
+
+let departCourse = null;
+let buffer = chargerTampon();
+let syncing = false;
+let dernierAjout = { valeur: null, t: 0 };
+let statusTimer = null;
+
+/* =========================================================
+   STATUT / MESSAGES
+   ========================================================= */
 
 function showStatus(text, cls, ttl = 700) {
-    status.textContent = text;
-    status.className = cls;
+    statusEl.textContent = text;
+    statusEl.className = cls;
+    input.classList.toggle("err", cls === "err");
+
+    clearTimeout(statusTimer);
     if (ttl) {
-        clearTimeout(showStatus._t);
-        showStatus._t = setTimeout(() => {
-            status.textContent = "";
-            status.className = "";
+        statusTimer = setTimeout(() => {
+            statusEl.textContent = "";
+            statusEl.className = "";
+            input.classList.remove("err");
         }, ttl);
     }
 }
 
-async function viderBase() {
-    const confirmation = confirm(
-        "Voulez-vous vraiment supprimer toutes les données ?"
-    );
-    if (!confirmation) return;
-    try {
-        await remove(ref(db, "saisie"));
-        showStatus("🗑 Base supprimée", "ok", 3000);
-    } catch (err) {
-        console.error(err);
-        showStatus("Erreur suppression", "err", 3000);
-    }
-}
-
-// --- Tampon local, persisté dans localStorage pour survivre à un rechargement/plantage ---
-const STORAGE_KEY = "saisie-rapide-tampon";
+/* =========================================================
+   PERSISTANCE LOCALE (tampon hors-ligne)
+   ========================================================= */
 
 function chargerTampon() {
     try {
@@ -205,21 +212,51 @@ function sauvegarderTampon() {
     }
 }
 
-let buffer = chargerTampon();   // { id, valeur, excelTime, error }
-let syncing = false;
-
 function nouvelId() {
     return crypto.randomUUID ? crypto.randomUUID() : Date.now() + "-" + Math.random();
 }
 
+/* =========================================================
+   AFFICHAGE DU TAMPON
+   ========================================================= */
+
 function renderBuffer() {
     pendingCountEl.textContent = buffer.length + " en attente";
     syncBtn.disabled = syncing || buffer.length === 0;
+
+    pendingListEl.innerHTML = "";
+    for (const entree of buffer) {
+        const li = document.createElement("li");
+        li.textContent = entree.valeur + (entree.error ? " — erreur" : "");
+        if (entree.error) li.className = "err";
+        pendingListEl.appendChild(li);
+    }
+
     sauvegarderTampon();
 }
 
-// Empêche d'ajouter deux fois la même valeur en rafale (rebond clavier / double tap)
-let dernierAjout = { valeur: null, t: 0 };
+/* =========================================================
+   CHARGEMENT DU DÉPART DE COURSE
+   ========================================================= */
+
+async function chargerDepartCourse() {
+    try {
+        const snapshot = await get(ref(db, "data/depart_course"));
+        if (snapshot.exists()) {
+            departCourse = new Date(snapshot.val()).getTime();
+        } else {
+            showStatus("⚠ Départ introuvable", "err", 3000);
+            setTimeout(chargerDepartCourse, RETRY_DEPART_MS);
+        }
+    } catch (err) {
+        showStatus("⚠ Erreur connexion", "err", 3000);
+        setTimeout(chargerDepartCourse, RETRY_DEPART_MS);
+    }
+}
+
+/* =========================================================
+   AJOUT D'UNE SAISIE
+   ========================================================= */
 
 function envoyer(e) {
     if (e) e.preventDefault();
@@ -227,26 +264,41 @@ function envoyer(e) {
     const valeur = input.value.trim();
     if (!valeur) return;
 
+    if (!/^[0-9]+$/.test(valeur)) {
+        showStatus("⚠ Numéro invalide", "err", 1500);
+        return;
+    }
+
+    if (!departCourse) {
+        showStatus("⚠ Départ de course indisponible", "err", 3000);
+        return;
+    }
+
+    // Anti double-saisie (ex: double appui / rebond du scanner)
     const maintenant = Date.now();
-    if (valeur === dernierAjout.valeur && maintenant - dernierAjout.t < 400) {
-        return; // doublon quasi-instantané, on ignore
+    if (valeur === dernierAjout.valeur && maintenant - dernierAjout.t < ANTI_REBOND_MS) {
+        return;
     }
     dernierAjout = { valeur, t: maintenant };
 
-    // --- Ajout 100% local, instantané, aucun appel réseau ici ---
-    buffer.push({
-        id: nouvelId(),
-        valeur,
-        excelTime: unixToExcelSerial(maintenant),
-        error: false
-    });
+    // Temps écoulé depuis le départ, converti en fraction de journée Excel
+    // (ex: départ à 07:00:00, saisie à 07:05:30 -> 330s -> 0,003819... jour)
+    const excelTime = (maintenant - departCourse) / 86400000;
+
+    // Une nouvelle saisie du même dossard remplace toujours la précédente,
+    // y compris si l'ancienne était encore en attente de synchronisation.
+    buffer = buffer.filter(entree => entree.valeur !== valeur);
+    buffer.push({ id: nouvelId(), valeur, excelTime, error: false });
 
     input.value = "";
-    input.classList.remove("err");
     showStatus("✔ Ajouté", "ok");
     input.focus();
     renderBuffer();
 }
+
+/* =========================================================
+   SYNCHRONISATION FIREBASE
+   ========================================================= */
 
 async function synchroniser() {
     if (syncing || buffer.length === 0) return;
@@ -255,7 +307,9 @@ async function synchroniser() {
     syncBtn.textContent = "Synchronisation…";
     renderBuffer();
 
-    const aEnvoyer = [...buffer]; // instantané du tampon au moment du clic
+    // Copie du tampon au début de la synchronisation
+    const aEnvoyer = [...buffer];
+
     const resultats = await Promise.allSettled(
         aEnvoyer.map(entree =>
             set(ref(db, "saisie/" + entree.valeur), entree.excelTime).then(() => entree.id)
@@ -267,8 +321,7 @@ async function synchroniser() {
     );
     const idsTentes = new Set(aEnvoyer.map(e => e.id));
 
-    // On retire ce qui a réussi, on marque en erreur ce qui a échoué,
-    // et on laisse intact ce qui a été ajouté pendant la synchro.
+    // On retire les envois réussis, on marque en erreur ceux qui ont échoué
     buffer = buffer
         .filter(e => !idsReussis.has(e.id))
         .map(e => idsTentes.has(e.id) ? { ...e, error: true } : e);
@@ -287,19 +340,42 @@ async function synchroniser() {
     renderBuffer();
 }
 
+/* =========================================================
+   SUPPRESSION DE LA BASE
+   ========================================================= */
+
+async function viderBase() {
+    if (!confirm("Supprimer toutes les données ?")) return;
+    try {
+        await remove(ref(db, "saisie"));
+        showStatus("🗑 Base supprimée", "ok", 3000);
+    } catch (err) {
+        showStatus("Erreur suppression", "err", 3000);
+    }
+}
+
+/* =========================================================
+   ÉVÉNEMENTS
+   ========================================================= */
+
 form.addEventListener("submit", envoyer);
 syncBtn.addEventListener("click", synchroniser);
-
-// État initial : affiche le tampon restauré (le cas échéant) et son décompte
-if (buffer.length > 0) {
-    showStatus(`↻ ${buffer.length} entrée(s) restaurée(s) — à synchroniser`, "err", 0);
-}
-renderBuffer();
+clearDbBtn.addEventListener("click", viderBase);
 
 window.addEventListener("load", () => input.focus());
 document.addEventListener("click", () => input.focus());
-clearDbBtn.addEventListener("click", viderBase);
-    
+
+/* =========================================================
+   INITIALISATION
+   ========================================================= */
+
+if (buffer.length > 0) {
+    showStatus(`↻ ${buffer.length} entrée(s) restaurée(s) — à synchroniser`, "err", 0);
+}
+
+renderBuffer();
+chargerDepartCourse();
+setInterval(synchroniser, AUTO_SYNC_MS); // tentative de sync auto en tâche de fond
 </script>
 
 </body>
