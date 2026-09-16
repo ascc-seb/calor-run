@@ -121,21 +121,10 @@ table td:nth-child(5) { width: 100px; text-align: center; }
 <script src="svg-animation.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script src="firebase-common.js"></script>
 <script>
 'use strict';
 
-const FIREBASE_CONFIG = {
-    apiKey: "AIzaSyAIAAz51gEGKQd0EoqA3yUhvnqw3DkQiIo",
-    authDomain: "calor-run.firebaseapp.com",
-    databaseURL: "https://calor-run-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "calor-run",
-    storageBucket: "calor-run.firebasestorage.app",
-    messagingSenderId: "329949291334",
-    appId: "1:329949291334:web:c71ef20268c609cf953b47",
-    measurementId: "G-YVQPW6JGPK"
-};
-
-firebase.initializeApp(FIREBASE_CONFIG);
 const db = firebase.database();
 
 const elements = {
@@ -157,40 +146,6 @@ const COURSE_KM = {
     '10km': 10,
     '20km': 20
 };
-
-function normalizeCourse(course) {
-    const value = String(course || '').trim();
-    switch (value) {
-        case '10':
-        case '10km':
-        case '10 km':
-            return '10km';
-        case '20':
-        case '20km':
-        case '20 km':
-            return '20km';
-        default:
-            return value;
-    }
-}
-
-function excelFractionToMs(excelValue) {
-    const fraction = Number(excelValue) % 1;
-    return fraction * 24 * 60 * 60 * 1000;
-}
-
-function formatTime(ms) {
-    const totalSeconds = Math.floor(ms / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
-}
-
-// Échappement basique pour éviter toute casse d'affichage si un champ contient < > & " '
-const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-}[ch]));
 
 function getRanking(courseFilter, categoryFilter, genderFilter) {
     return Object.entries(liveScratch)
@@ -322,21 +277,6 @@ function populateCategories() {
         elements.filterCat.appendChild(option);
     });
 }
-
-// === Firebase Listeners sécurisés ===
-const safeListener = (ref, onData, onError) => {
-    if (!ref || typeof ref.on !== 'function') {
-        console.error('safeListener: référence Firebase invalide', ref);
-        return;
-    }
-    ref.on('value', snapshot => {
-        try {
-            onData(snapshot);
-        } catch (err) {
-            console.error('Erreur Firebase :', err);
-        }
-    }, onError);
-};
 
 // Participants
 safeListener(db.ref('participants'), snapshot => {
