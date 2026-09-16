@@ -68,20 +68,9 @@ tr.femme td { color: var(--secondary-color); }
 <script src="svg-animation.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script src="firebase-common.js"></script>
 <script>
 'use strict';
-
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyAIAAz51gEGKQd0EoqA3yUhvnqw3DkQiIo",
-  authDomain: "calor-run.firebaseapp.com",
-  databaseURL: "https://calor-run-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "calor-run",
-  storageBucket: "calor-run.firebasestorage.app",
-  messagingSenderId: "329949291334",
-  appId: "1:329949291334:web:c71ef20268c609cf953b47",
-  measurementId: "G-YVQPW6JGPK"
-};
-firebase.initializeApp(FIREBASE_CONFIG);
 
 // === Détection distance depuis URL ===
 const urlParams = new URLSearchParams(window.location.search);
@@ -112,22 +101,6 @@ const el = {
 let participants = {};
 let live_scratch = {};
 let searchTerm = '';
-
-// Convertit une valeur Excel (fraction de jour) en "HH:MM:SS"
-const formatExcelTime = value => {
-  const totalSeconds = Math.round((Number(value) % 1) * 86400);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return [hours, minutes, seconds]
-    .map(n => String(n).padStart(2, '0'))
-    .join(':');
-};
-
-// Échappement basique pour éviter toute casse d'affichage si un champ contient < > & " '
-const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
-  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-}[ch]));
 
 // === Calcul du classement complet (dépend de participants + live_scratch) ===
 const computeRanking = () => {
@@ -213,17 +186,6 @@ const scheduleRender = () => {
   if (renderScheduled) return;
   renderScheduled = true;
   queueMicrotask(() => { renderScheduled = false; render(); });
-};
-
-// === Firebase Listeners sécurisés ===
-const safeListener = (ref, onData, onError) => {
-  if (!ref || typeof ref.on !== 'function') {
-    console.error('safeListener: référence Firebase invalide', ref);
-    return;
-  }
-  ref.on('value', snapshot => {
-    try { onData(snapshot); } catch (err) { console.error('Erreur Firebase :', err); }
-  }, onError);
 };
 
 safeListener(db.participants, snap => { participants = snap.val() || {}; scheduleRender(); });
