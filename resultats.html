@@ -47,11 +47,11 @@ tr.femme td { color: var(--secondary-color); }
   <table>
     <thead>
       <tr>
-        <th class="text-center">Scratch</th>
         <th class="text-center">Dossard</th>
         <th>Nom</th>
         <th>Prénom</th>
         <th class="text-center">Temps</th>
+        <th class="text-center">Scratch</th>
         <th class="text-center">Genre</th>
         <th class="text-center">Pos. Genre</th>
         <th class="text-center">Cat</th>
@@ -189,11 +189,11 @@ const render = () => {
     const tr = document.createElement('tr');
     if (p.genre === 'F') tr.classList.add('femme');
     tr.innerHTML = `
-      <td class="text-center">${p.scratch}</td>
       <td class="text-center">${escapeHtml(p.dossard)}</td>
       <td>${escapeHtml(p.nom)}</td>
       <td>${escapeHtml(p.prenom)}</td>
       <td class="text-center">${p.tempsStr}</td>
+      <td class="text-center">${p.scratch}</td>
       <td class="text-center">${escapeHtml(p.genre)}</td>
       <td class="text-center">${p.posGenre}</td>
       <td class="text-center">${escapeHtml(p.categorie)}</td>
