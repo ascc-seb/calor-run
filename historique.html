@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Historique Calor Run</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏅</text></svg>">
+<link rel="stylesheet" href="common.css">
+<style>
+/* --- Ligne 1 : recherche pleine largeur --- */
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+.search-row #search {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-bottom: 1px solid #888;
+  background: transparent;
+  color: var(--text-dark);
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.3s;
+}
+.search-row #counter {
+  flex-shrink: 0;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-dark);
+}
+.search-row #search:focus { border-bottom-color: var(--primary-color); }
+
+/* --- Ligne 2 : navigation années / séparateur / formats + compteur --- */
+.filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem 0.75rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.95rem;
+}
+#years-nav, #format-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.4rem;
+}
+#years-nav a, #format-nav a {
+  text-decoration: none;
+  color: var(--text-dark);
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.3rem;
+  transition: background-color 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+#years-nav a.active, #format-nav a.active {
+  background: var(--primary-color);
+  color: #fff;
+  font-weight: 600;
+}
+#format-nav a[data-course="10"]:not(.active) { color: var(--primary-color); }
+#format-nav a[data-course="20"]:not(.active) { color: var(--secondary-color); }
+.sep {
+  color: black;
+  font-weight: 300;
+  padding: 0 0.125rem;
+}
+tr.femme td { color: var(--secondary-color); }
+.no-result { text-align: center; padding: 1.25rem 0; font-size: 1rem; }
+.fetch-error { text-align:center; padding:1.25rem; color:#b00020; font-size:0.95rem; }
+
+@media (max-width: 768px) {
+  .filters-row { flex-direction: column; gap: 0.5rem; }
+  #years-nav, #format-nav { justify-content: center; width: 100%; }
+  .sep { display: none; }
+  .search-row #search, .filters-row { font-size: 0.85rem; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="svg-wrapper">
+      <span class="header-title" id="header-title"></span>
+      <div id="animSvgContainer"></div>
+    </div>
+  </div>
+
+  <!-- Ligne 1 : recherche -->
+  <div class="search-row">
+    <input type="text" id="search" placeholder="Recherche par Nom, prénom, cat. (ex: SE)" autocomplete="off" aria-label="Recherche par Nom, prénom ou catégorie">
+    <div id="counter"></div>
+  </div>
+
+  <!-- Ligne 2 : années | séparateur | formats + compteur -->
+  <div class="filters-row">
+    <nav id="years-nav" aria-label="Choix de l'année"></nav>
+    <span class="sep" aria-hidden="true">•</span>
+    <nav id="format-nav" aria-label="Choix du format"></nav>
+  </div>
+</div>
+
+<div class="table-container hidden" id="table-container">
+  <table>
+    <thead>
+      <tr id="thead-row">
+        <th>Nom</th>
+        <th>Prénom</th>
+        <th class="text-center">Temps</th>
+	<th class="text-center">Scratch</th>
+        <th class="text-center">Genre</th>
+        <th class="text-center">Pos. Genre</th>
+        <th class="text-center">Cat</th>
+        <th class="text-center">Pos. Cat</th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+      <tr><td colspan="100%" class="loading">Connexion...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script src="svg-logo.js"></script>
+<script src="svg-animation.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script>
+'use strict';
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAIAAz51gEGKQd0EoqA3yUhvnqw3DkQiIo",
+  authDomain: "calor-run.firebaseapp.com",
+  databaseURL: "https://calor-run-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "calor-run",
+  storageBucket: "calor-run.firebasestorage.app",
+  messagingSenderId: "329949291334",
+  appId: "1:329949291334:web:c71ef20268c609cf953b47",
+  measurementId: "G-YVQPW6JGPK"
+};
+firebase.initializeApp(FIREBASE_CONFIG);
+
+// === Paramètres URL ===
+const urlParams = new URLSearchParams(window.location.search);
+let anneeParam = urlParams.get('annee');       // année, "all" ou null (=> dernière année)
+let distanceParam = urlParams.get('distance'); // format (km), ou null (=> tous formats)
+let searchParam = urlParams.get('q') || '';    // terme de recherche, conservé au fil de la navigation
+
+// Le nœud "historique" est à la racine de la base (frère de "data"),
+// et contient une entrée par coureur/année : historique/{year}{bib}/...
+const db = { historique: firebase.database().ref('historique') };
+
+const el = {
+  tbody: document.getElementById('tbody'),
+  table: document.getElementById('table-container'),
+  theadRow: document.getElementById('thead-row'),
+  search: document.getElementById('search'),
+  yearsNav: document.getElementById('years-nav'),
+  formatNav: document.getElementById('format-nav'),
+  counter: document.getElementById('counter'),
+  headerTitle: document.getElementById('header-title')
+};
+
+let historique = {};
+let searchTerm = searchParam;
+el.search.value = searchTerm;
+
+// Échappement basique pour éviter toute casse d'affichage
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+}[ch]));
+
+// Construit une URL relative avec les paramètres fournis
+// (le terme de recherche en cours est automatiquement conservé)
+const buildUrl = ({ annee, distance }) => {
+  const p = new URLSearchParams();
+  if (annee) p.set('annee', annee);
+  if (distance) p.set('distance', distance);
+  if (searchTerm) p.set('q', searchTerm);
+  const qs = p.toString();
+  return qs ? `?${qs}` : location.pathname;
+};
+
+// Lecture pure des champs déjà calculés en base (aucun recalcul) :
+// clmt_scratch, clmt_genre, clmt_cat sont pris tels quels depuis "historique".
+// On trie simplement par clmt_scratch pour l'affichage.
+const getRanking = records => {
+  const data = records.map(r => ({
+    ...r,
+    scratch: r.clmt_scratch,
+    posGenre: r.clmt_genre,
+    posCat: r.clmt_cat
+  }));
+  data.sort((a, b) => Number(a.scratch) - Number(b.scratch));
+  return data;
+};
+
+const renderTableHead = (showYear, showFormat) => {
+  el.theadRow.innerHTML = `
+    ${showYear ? '<th class="text-center">Année</th>' : ''}
+    <th>Nom</th>
+    <th>Prénom</th>
+    ${showFormat ? '<th class="text-center">Format</th>' : ''}
+    <th class="text-center">Temps</th>
+    <th class="text-center">Scratch</th>
+    <th class="text-center">Genre</th>
+    <th class="text-center">Pos. Genre</th>
+    <th class="text-center">Cat</th>
+    <th class="text-center">Pos. Cat</th>
+  `;
+};
+
+const showFetchError = message => {
+  el.tbody.innerHTML = `<tr><td colspan="100%" class="fetch-error">${escapeHtml(message)}</td></tr>`;
+  el.table.classList.remove('hidden');
+};
+
+const render = () => {
+  const all = Object.values(historique);
+  if (all.length === 0) {
+    showFetchError('Aucune donnée disponible pour le moment.');
+    return;
+  }
+
+  // --- Années disponibles ---
+  const years = [...new Set(all.map(r => String(r.year)))].filter(Boolean).sort((a, b) => b - a);
+  const latestYear = years[0];
+  if (!anneeParam || (anneeParam !== 'all' && !years.includes(anneeParam))) {
+    anneeParam = latestYear;
+  }
+  const isAllYears = anneeParam === 'all';
+  const scopeYear = isAllYears ? all : all.filter(r => String(r.year) === anneeParam);
+
+  // --- Formats disponibles pour l'année (ou toutes années) sélectionnée ---
+  const formats = [...new Set(scopeYear.map(r => String(r.course)))].filter(Boolean).sort((a, b) => a - b);
+  if (distanceParam && !formats.includes(distanceParam)) distanceParam = null;
+  const isAllFormats = !distanceParam;
+  const scopeFinal = isAllFormats ? scopeYear : scopeYear.filter(r => String(r.course) === distanceParam);
+
+  // --- Navigation années ---
+  const yearLinks = years.map(y =>
+    `<a href="${buildUrl({ annee: y })}" class="${y === anneeParam ? 'active' : ''}">${y}</a>`
+  ).join('');
+  el.yearsNav.innerHTML = yearLinks +
+    `<a href="${buildUrl({ annee: 'all' })}" class="${isAllYears ? 'active' : ''}">Toutes</a>`;
+
+  // --- Navigation formats ---
+  const formatLinks = formats.map(f =>
+    `<a href="${buildUrl({ annee: anneeParam, distance: f })}" class="${f === distanceParam ? 'active' : ''}" data-course="${f}">${f} km</a>`
+  ).join('');
+  el.formatNav.innerHTML =
+    `<a href="${buildUrl({ annee: anneeParam })}" class="${isAllFormats ? 'active' : ''}">Toutes</a>` + formatLinks;
+
+  // --- Titre ---
+  const titleBits = [isAllYears ? 'CALOR RUN' : anneeParam];
+  if (!isAllFormats) titleBits.push(`${distanceParam} KM`);
+  el.headerTitle.textContent = `HISTORIQUE ${titleBits.join(' - ')}`;
+  document.title = `Historique ${isAllYears ? '' : anneeParam}${isAllFormats ? '' : ' - ' + distanceParam + ' km'} Calor Run`;
+
+  // --- Classement : lecture pure des champs déjà en base (pas de recalcul) ---
+  const ranking = getRanking(scopeFinal);
+
+  // --- Recherche (nom, prénom, catégorie) ---
+  const term = searchTerm.trim().toLowerCase();
+  let visible = term
+    ? ranking.filter(p =>
+        (p.nom || '').toLowerCase().includes(term) ||
+        (p.prenom || '').toLowerCase().includes(term) ||
+        (p.cat || '').toLowerCase().includes(term))
+    : ranking;
+
+  // En cas de recherche, on trie par année décroissante (plutôt que par scratch)
+  if (term) {
+    visible = [...visible].sort((a, b) => Number(b.year) - Number(a.year));
+  }
+
+  // --- Compteur ---
+  el.counter.textContent = `${ranking.length} classé${ranking.length > 1 ? 's' : ''}`;
+
+  // --- Colonnes dynamiques ---
+  const showYearCol = isAllYears;
+  const showFormatCol = isAllFormats;
+  renderTableHead(showYearCol, showFormatCol);
+
+  if (visible.length === 0) {
+    el.tbody.innerHTML = `<tr><td colspan="100%" class="no-result">Aucun résultat</td></tr>`;
+    el.table.classList.remove('hidden');
+    return;
+  }
+
+  const frag = document.createDocumentFragment();
+  visible.forEach(p => {
+    const tr = document.createElement('tr');
+    if (p.genre === 'F') tr.classList.add('femme');
+    tr.innerHTML = `
+      
+      ${showYearCol ? `<td class="text-center">${escapeHtml(p.year)}</td>` : ''}
+      <td>${escapeHtml(p.nom)}</td>
+      <td>${escapeHtml(p.prenom)}</td>
+      ${showFormatCol ? `<td class="text-center">${escapeHtml(p.course)} km</td>` : ''}
+      <td class="text-center">${escapeHtml(p.temps)}</td>
+      <td class="text-center">${p.scratch}</td>
+      <td class="text-center">${escapeHtml(p.genre)}</td>
+      <td class="text-center">${p.posGenre}</td>
+      <td class="text-center">${escapeHtml(p.cat)}</td>
+      <td class="text-center">${p.posCat}</td>
+    `;
+    frag.appendChild(tr);
+  });
+  el.tbody.innerHTML = '';
+  el.tbody.appendChild(frag);
+  el.table.classList.remove('hidden');
+};
+
+// === Firebase Listener sécurisé ===
+const safeListener = (ref, onData, onError) => {
+  if (!ref || typeof ref.on !== 'function') {
+    console.error('safeListener: référence Firebase invalide', ref);
+    return;
+  }
+  ref.on('value', snapshot => {
+    try { onData(snapshot); } catch (err) { console.error('Erreur Firebase :', err); }
+  }, onError);
+};
+
+safeListener(
+  db.historique,
+  snap => {
+    historique = snap.val() || {};
+    console.log(`[Calor Run] Lecture "historique" OK : ${Object.keys(historique).length} enregistrement(s).`);
+    render();
+  },
+  err => {
+    console.error('[Calor Run] Erreur lecture "historique" :', err);
+    showFetchError(`Erreur de connexion à la base de données : ${err.code || err.message || err}`);
+  }
+);
+
+// === Recherche ===
+// Le terme de recherche est conservé dans l'URL (paramètre "q") afin de
+// persister à travers les clics sur les liens années/formats et un rechargement.
+el.search.addEventListener('input', e => {
+  searchTerm = e.target.value;
+  history.replaceState(null, '', buildUrl({ annee: anneeParam, distance: distanceParam }));
+  render();
+});
+</script>
+</body>
+</html>
