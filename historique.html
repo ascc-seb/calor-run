@@ -340,8 +340,7 @@ safeListener(
 );
 
 // === Recherche ===
-// Le terme de recherche est conservé dans l'URL (paramètre "q") afin de
-// persister à travers les clics sur les liens années/formats et un rechargement.
+// Le terme de recherche est conservé dans l'URL (paramètre "q") afin de persister à travers les clics sur les liens années/formats et un rechargement.
 el.search.addEventListener('input', e => {
   searchTerm = e.target.value;
   history.replaceState(null, '', buildUrl({ annee: anneeParam, distance: distanceParam }));
