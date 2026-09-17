@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Calor Run</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⏱️</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css">
+<style>
+/* =====================================================================
+   Page dédiée à un affichage grand écran (Full HD 1920x1080). La priorité va à la lisibilité.
+   ===================================================================== */
+
+/* =====================================================================
+   RÉGLAGES DU QR CODE — à modifier ici uniquement pour repositionner ou redimensionner la superposition (pas besoin de toucher au reste) :
+     --qrcode-x   : distance depuis le BORD DROIT de la bannière
+     --qrcode-y   : distance depuis le BORD HAUT de la bannière
+     --qrcode-size : largeur de l'image (la hauteur suit automatiquement, l'image garde ses proportions d'origine)
+   ===================================================================== */
+:root {
+    --qrcode-x: 30px;
+    --qrcode-y: 10px;
+    --qrcode-size: 220px;
+}
+
+/* Particularité de cette page : le conteneur et le tableau exploitent une
+   bien plus grande largeur que le standard du site, pour occuper au mieux
+   un écran 1920px de large en plein écran. */
+.container { max-width: 1800px; }
+.table-container { width: 100%; max-width: 1800px; }
+
+.chrono-time {
+    position:absolute;
+    top:30%;
+    left:50%;
+    transform:translate(-50%, -50%);
+    z-index:2;
+    font-family: 'Share Tech Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 5.5rem;
+    color: var(--primary-color);
+    text-shadow: 0 0 6px rgba(255,255,255,0.85), 0 0 3px rgba(255,255,255,0.85);
+}
+.chrono-time.paused { opacity: 0.7; }
+.chrono-time.chrono-message {
+    font-size: 2.6rem;
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+}
+
+.counter-line { text-align: center; margin-bottom: 25px; font-size: 1.7rem; }
+.counter-error {
+    animation: blinker 2s linear infinite;
+    color: red;
+}
+@keyframes blinker { 50% { opacity: 0; } }
+
+/* Tableau de classement agrandi : texte, espacements et lignes plus généreux */
+#classement { font-size: 1.35rem; }
+#classement th, #classement td { padding: 0.9rem 1rem; }
+#classement th { font-size: 1.1rem; letter-spacing: 0.5px; }
+
+#loading { font-size: 1.7rem; }
+
+/* Superposition du QR code en haut à droite de la bannière */
+.header { position: relative; }
+.qr-overlay {
+    position: absolute;
+    top: var(--qrcode-y);
+    right: var(--qrcode-x);
+    width: var(--qrcode-size);
+    height: auto;
+    z-index: 3;
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+      <div class="svg-wrapper">
+        <div class="chrono-time paused" id="chrono-time">
+            <span id="chrono-text">...</span>
+        </div>
+<div id="animSvgContainer"></div>
+      </div>
+      <img src="qrcode.png" alt="QR code : scannez pour suivre le direct" class="qr-overlay">
+    </div>
+    <div id="loading" class="loading"> ⌛ Chargement des données...</div>
+        <div id="compteurs" class="counter-line hidden">
+        <span class="counter-10km">10 km : 0</span>
+        <span>•</span>
+        <span class="counter-20km">20 km : 0</span>
+        <span> • </span>
+        <span class="counter-total">Total : 0</span>
+    </div>
+</div>
+<div class="table-container hidden" id="table-container">
+    <table id="classement">
+        <thead>
+            <tr>
+                <th class="text-center">Dossard</th>
+                <th>Nom</th>
+                <th>Prénom</th>
+                <th class="text-center">Course</th>
+                <th class="text-center">Temps</th>
+                <th class="text-center">Scratch</th>
+                <th class="text-center">Genre</th>
+                <th class="text-center">Pos. Genre</th>
+                <th class="text-center">CAT</th>
+                <th class="text-center">Pos. CAT</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script src="svg-logo.js"></script>
+<script src="svg-animation.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script src="firebase-common.js"></script>
+<script>
+'use strict';
+
+const elements = {
+    chronoTime: document.getElementById('chrono-time'),
+    chronoText: document.getElementById('chrono-text'),
+    loading: document.getElementById('loading'),
+    compteurs: document.getElementById('compteurs'),
+    tbody: document.querySelector('#classement tbody'),
+    tableContainer: document.getElementById('table-container'),
+    counter10km: null,
+    counter20km: null,
+    counterTotal: null
+};
+
+elements.counter10km = elements.compteurs.querySelector('.counter-10km');
+elements.counter20km = elements.compteurs.querySelector('.counter-20km');
+elements.counterTotal = elements.compteurs.querySelector('.counter-total');
+
+let departureTimestamp = null;
+let finCourseTimestamp = null;
+let participants = {};
+let arrivees = {};
+let chronoInterval = null;
+
+const db = firebase.database();
+
+// Fenêtre de secours si data/fin_course n'est pas (encore) configuré dans Firebase (4h après le départ)
+const DEFAULT_RACE_WINDOW_MS = 4 * 60 * 60 * 1000;
+
+// Formate un compte à rebours en "hh:mm:ss", ou "Xj hh:mm:ss" si au moins 1 jour restant
+function formatCountdown(ms) {
+    const totalSeconds = Math.max(Math.floor(ms / 1000), 0);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const daysPart = days > 0 ? `${days}j ` : '';
+    return `${daysPart}${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+}
+
+// Instant de fin de course effectif : data/fin_course si défini, sinon départ + 4h par défaut
+function getEffectiveFinCourse() {
+    if (finCourseTimestamp) return finCourseTimestamp;
+    if (departureTimestamp) return departureTimestamp + DEFAULT_RACE_WINDOW_MS;
+    return null;
+}
+
+// Détermine et affiche l'état du chrono selon l'heure actuelle par rapport à
+// data/depart_course et data/fin_course :
+// 1. avant le départ         -> compte à rebours "DEPART DANS : Xj hh:mm:ss"
+// 2. départ, avant la fin    -> chrono normal "00:00:00"
+// 3. après la fin de course  -> message de fin "BRAVO, RDV EN {année+1} !"
+function updateChronoDisplay() {
+    if (!departureTimestamp) {
+        elements.chronoText.textContent = "CHRONO INDISPONIBLE";
+        elements.chronoTime.classList.add("paused", "chrono-message");
+        return;
+    }
+    const now = Date.now();
+    const elapsed = now - departureTimestamp;
+    const finCourse = getEffectiveFinCourse();
+    elements.chronoTime.classList.remove("paused");
+    if (elapsed < 0) {
+        elements.chronoText.textContent = `DEPART DANS : ${formatCountdown(-elapsed)}`;
+        elements.chronoTime.classList.add("chrono-message");
+    } else if (!finCourse || now < finCourse) {
+        elements.chronoText.textContent = formatTime(elapsed);
+        elements.chronoTime.classList.remove("chrono-message");
+    } else {
+        const nextYear = new Date(departureTimestamp).getFullYear() + 1;
+        elements.chronoText.textContent = `BRAVO, RDV EN ${nextYear} !`;
+        elements.chronoTime.classList.add("chrono-message");
+    }
+}
+
+function startChrono() {
+    clearInterval(chronoInterval);
+    updateChronoDisplay();
+    chronoInterval = setInterval(updateChronoDisplay, 1000);
+}
+
+function createTableRow(participant){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td class="text-center">${escapeHtml(participant.dossard)}</td>
+        <td>${escapeHtml(participant.nom)}</td>
+        <td>${escapeHtml(participant.prenom)}</td>
+        <td class="text-center">${escapeHtml(participant.course)}</td>
+        <td class="text-center">${participant.tempsStr}</td>
+        <td class="text-center">${participant.scratch}</td>
+        <td class="text-center">${escapeHtml(participant.genre)}</td>
+        <td class="text-center">${participant.posGenre}</td>
+        <td class="text-center">${escapeHtml(participant.categorie)}</td>
+        <td class="text-center">${participant.posCat}</td>
+    `;
+    return tr;
+}
+
+// Classement affiché du plus lent (en haut) au plus rapide (en bas).
+// Les rangs (scratch / genre / catégorie) restent calculés du plus rapide au plus lent :
+// on parcourt donc le tableau trié en sens inverse pour incrémenter les compteurs.
+function calculatePositions(classement){
+    const scratchCounter={}, genreCounter={}, catCounter={};
+    let count10=0, count20=0, total10=0, total20=0;
+
+    Object.values(participants).forEach(p=>{
+        const courseNormalized = normalizeCourse(p.course);
+        if(courseNormalized==='10km') total10++; else if(courseNormalized==='20km') total20++;
+    });
+
+    for(let i=classement.length-1;i>=0;i--){
+        const p = classement[i];
+        const courseNormalized = normalizeCourse(p.course);
+        if(courseNormalized==='10km') count10++; else if(courseNormalized==='20km') count20++;
+
+        scratchCounter[courseNormalized] = (scratchCounter[courseNormalized]||0)+1;
+        p.scratch = scratchCounter[courseNormalized];
+
+        const genreKey = `${courseNormalized}_${p.genre}`;
+        genreCounter[genreKey] = (genreCounter[genreKey]||0)+1;
+        p.posGenre = genreCounter[genreKey];
+
+        const catKey = `${courseNormalized}_${p.genre}_${p.categorie}`;
+        catCounter[catKey] = (catCounter[catKey]||0)+1;
+        p.posCat = catCounter[catKey];
+    }
+    return {count10,count20,total10,total20};
+}
+
+function displayData(classement,count10,count20,total10,total20){
+    const fragment = document.createDocumentFragment();
+    classement.forEach(p=>fragment.appendChild(createTableRow(p)));
+    elements.tbody.innerHTML=''; elements.tbody.appendChild(fragment);
+    elements.loading.classList.add('hidden');
+    elements.compteurs.classList.remove('hidden');
+    elements.tableContainer.classList.remove('hidden');
+    elements.counter10km.textContent=`10 km : ${count10}/${total10}`;
+    elements.counter20km.textContent=`20 km : ${count20}/${total20}`;
+    elements.counterTotal.textContent=`Total : ${classement.length}/${total10+total20}`;
+    const displayedTotal = classement.length, expectedTotal=count10+count20;
+    if(displayedTotal!==expectedTotal) elements.counterTotal.classList.add('counter-error');
+    else elements.counterTotal.classList.remove('counter-error');
+}
+
+function updateClassement(){
+    if (Object.keys(arrivees).length === 0) {
+
+        elements.tbody.innerHTML = `
+            <tr>
+                <td colspan="10" class="loading">Aucun résultat</td>
+            </tr>
+        `;
+
+        elements.loading.classList.add('hidden');
+        elements.compteurs.classList.remove('hidden');
+        elements.tableContainer.classList.remove('hidden');
+
+        const total10 = Object.values(participants)
+            .filter(p => normalizeCourse(p.course) === '10km')
+            .length;
+
+        const total20 = Object.values(participants)
+            .filter(p => normalizeCourse(p.course) === '20km')
+            .length;
+
+        elements.counter10km.textContent = `10 km : 0/${total10}`;
+        elements.counter20km.textContent = `20 km : 0/${total20}`;
+        elements.counterTotal.textContent = `Total : 0/${total10 + total20}`;
+        elements.counterTotal.classList.remove('counter-error');
+
+        return;
+    }
+    const classement = Object.keys(arrivees).map(dossard => {
+        const valeurExcel = Number(arrivees[dossard]);
+        const fractionJour = valeurExcel %1;
+        const tempsMs = Math.round(fractionJour * 86400000);
+        const p = participants[String(dossard)] || {};
+        return {
+            dossard: dossard,
+            nom: p.nom || '',
+            prenom: p.prenom || '',
+            tempsMs: tempsMs,
+            tempsStr: formatTime(tempsMs),
+            course: p.course || '',
+            genre: p.genre || '',
+            categorie: p.categorie || ''
+        };
+    })
+    .filter(p => Number.isFinite(p.tempsMs))
+    .sort((a, b) => b.tempsMs - a.tempsMs); // plus lent en premier (en haut du tableau)
+
+    const {
+        count10,
+        count20,
+        total10,
+        total20
+    } = calculatePositions(classement);
+
+    displayData(
+        classement,
+        count10,
+        count20,
+        total10,
+        total20
+    );
+}
+
+// Évite plusieurs recalculs si plusieurs refs Firebase changent au même moment
+let updateScheduled = false;
+function scheduleUpdate(){
+    if (updateScheduled) return;
+    updateScheduled = true;
+    queueMicrotask(() => { updateScheduled = false; updateClassement(); });
+}
+
+// Chronomètre — départ
+safeListener(
+    db.ref('data/depart_course'),
+    snapshot => {
+        departureTimestamp = snapshot.exists()
+            ? new Date(snapshot.val()).getTime()
+            : null;
+
+        startChrono();
+    }
+);
+
+// Chronomètre — fin de course (ex: "2026-09-16T07:00:00.000Z")
+safeListener(
+    db.ref('data/fin_course'),
+    snapshot => {
+        finCourseTimestamp = snapshot.exists()
+            ? new Date(snapshot.val()).getTime()
+            : null;
+
+        startChrono();
+    }
+);
+
+// Participants
+safeListener(
+    db.ref('participants'),
+    snapshot => {
+        participants = snapshot.val() || {};
+        scheduleUpdate();
+    }
+);
+
+// Résultats dynamiques selon data/base_ref
+let arriveesRef = null;
+
+safeListener(
+    db.ref('data/base_ref'),
+    snapshot => {
+        const baseRef = String(
+            snapshot.val() || 'live_scratch'
+        ).trim();
+
+        // Désabonnement de l'ancienne source
+        if (arriveesRef) {
+            arriveesRef.off('value');
+        }
+
+        // Réinitialise les arrivées lors du changement de source
+        arrivees = {};
+
+        // Nouvelle source définie dans data/base_ref
+        arriveesRef = db.ref(baseRef);
+
+        safeListener(
+            arriveesRef,
+            dataSnapshot => {
+                arrivees = dataSnapshot.val() || {};
+                scheduleUpdate();
+            }
+        );
+    }
+);
+
+// Nettoyage à la fermeture de la page
+window.addEventListener('beforeunload', () => {
+    if (chronoInterval) {
+        clearInterval(chronoInterval);
+    }
+
+    if (arriveesRef) {
+        arriveesRef.off('value');
+    }
+});
+</script>
+</body>
+</html>
