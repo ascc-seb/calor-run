@@ -84,7 +84,8 @@
   .age-birthdate { color: var(--text-muted); }
 
   #tbl-clubs th:nth-child(1), #tbl-clubs td:nth-child(1),
-  #tbl-clubs th:nth-child(3), #tbl-clubs td:nth-child(3) { text-align: center; }
+  #tbl-clubs th:nth-child(3), #tbl-clubs td:nth-child(3),
+  #tbl-clubs th:nth-child(4), #tbl-clubs td:nth-child(4) { text-align: center; }
 
   .error {
     display: none;
@@ -236,9 +237,9 @@
     <div class="table-title">Clubs les plus représentés</div>
     <table id="tbl-clubs">
       <thead>
-        <tr><th>Rang</th><th>Club</th><th>Participants</th></tr>
+        <tr><th>Rang</th><th>Club</th><th>Participants</th><th>Km totaux</th></tr>
       </thead>
-      <tbody><tr><td colspan="3" class="muted">Chargement…</td></tr></tbody>
+      <tbody><tr><td colspan="4" class="muted">Chargement…</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -302,6 +303,10 @@
 
   const ORDER_CAT = ['CA', 'JU', 'ES', 'SE', 'M0', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10'];
 
+  // Distance (en km) associée à chaque course normalisée, utilisée pour le total kilométrique des clubs
+  // (même mapping que dans podiums.html, pour rester cohérent entre les deux pages)
+  const COURSE_KM = { '10km': 10, '20km': 20 };
+
   // --- Helpers communs -----------------------------------------------
 
   /** Extrait le numéro de course (10 ou 20), que "course" soit un nombre ou un texte ("10 km", "20", ...). */
@@ -312,6 +317,14 @@
       return m ? Number(m[1]) : 0;
     }
     return 0;
+  }
+
+  /** Normalise un identifiant de course ("10", "10km", "10 km"...) vers un format unique ("10km"/"20km"). */
+  function normalizeCourse(course) {
+    const n = getCourseNumber({ course });
+    if (n === 10) return '10km';
+    if (n === 20) return '20km';
+    return String(course || '').trim();
   }
 
   function isFemale(p) {
@@ -651,22 +664,26 @@
     bodyOld.innerHTML = rowFor('F', oldestWoman) + rowFor('H', oldestMan);
   }
 
-  // --- Tableau 3 : classement des clubs --------------------------------
+  // --- Tableau 3 : classement des clubs (avec cumul de km, même calcul que podiums.html) --------------
   function renderClubs(body, data) {
-    const clubsCount = {};
+    const clubsStats = {};
 
     Object.values(data || {}).forEach((p) => {
       const club = (p.club || '').trim();
       if (!club) return;
-      clubsCount[club] = (clubsCount[club] || 0) + 1;
+      const km = COURSE_KM[normalizeCourse(p.course)] || 0;
+      clubsStats[club] = clubsStats[club] || { count: 0, km: 0 };
+      clubsStats[club].count += 1;
+      clubsStats[club].km += km;
     });
 
-    const sortedClubs = Object.entries(clubsCount)
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    // Tri à 3 niveaux : 1) nombre de coureurs (desc), 2) km totaux (desc), 3) nom du club (alphabétique)
+    const sortedClubs = Object.entries(clubsStats)
+      .sort((a, b) => b[1].count - a[1].count || b[1].km - a[1].km || a[0].localeCompare(b[0]));
 
     body.innerHTML = sortedClubs.length
-      ? sortedClubs.map(([club, count], i) => `<tr><td>${i + 1}</td><td>${escapeHtml(club)}</td><td>${count}</td></tr>`).join('')
-      : '<tr><td colspan="3" class="muted">Aucune donnée.</td></tr>';
+      ? sortedClubs.map(([club, stats], i) => `<tr><td>${i + 1}</td><td>${escapeHtml(club)}</td><td>${stats.count}</td><td>${stats.km}</td></tr>`).join('')
+      : '<tr><td colspan="4" class="muted">Aucune donnée.</td></tr>';
   }
 
   function showError(msg) {
