@@ -23,6 +23,7 @@
     color: var(--primary-color);
     display: flex;
     justify-content: space-between;
+    align-items: center;
     flex-wrap: wrap;
     gap: 0.5rem;
   }
@@ -58,6 +59,7 @@
     align-items: center;
     gap: 0.375rem;
     font-size: 0.95rem;
+    white-space: nowrap;
   }
   .age-filter a {
     text-decoration: none;
@@ -130,9 +132,22 @@
 
   @media (max-width: 768px) {
     table { min-width: auto; }
-    .table-title { flex-direction: column; }
     .charts-grid { grid-template-columns: 1fr; }
     .chart-box { height: 240px; }
+    /* Bug fix 1 : sans largeur minimale explicite, une table en table-layout:fixed
+       (comme .tbl-age-extreme) se contracte toujours exactement à la largeur du
+       conteneur au lieu de déborder — elle ne déclenche donc jamais le défilement
+       horizontal (overflow-x:auto) déjà actif sur .table-container, contrairement
+       aux autres tableaux de la page (table-layout:auto) qui débordent naturellement.
+       On force ici une largeur minimale pour retrouver le même comportement de
+       défilement que les autres tableaux. */
+    .tbl-age-extreme { min-width: 560px; }
+    /* Bug fix 2 : sur mobile, le filtre (nav) passait systématiquement à la ligne
+       suivante à cause d'un flex-direction:column hérité ; il y a pourtant assez de
+       place pour rester sur la même ligne que le titre. On repasse donc en row et on
+       laisse le flex-wrap (déjà présent sur .table-title) gérer un repli à la ligne
+       uniquement si l'espace venait vraiment à manquer sur un écran très étroit. */
+    .table-title { flex-direction: row; }
   }
 </style>
 </head>
