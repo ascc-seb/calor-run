@@ -46,12 +46,45 @@
   #tbl-cat tbody td:nth-child(5),
   #tbl-cat tbody td:nth-child(8) { border-left: 2px solid #d7d7d7; }
 
-  #tbl-age th:nth-child(1), #tbl-age td:nth-child(1),
-  #tbl-age th:nth-child(4), #tbl-age td:nth-child(4),
-  #tbl-age th:nth-child(5), #tbl-age td:nth-child(5),
-  #tbl-age th:nth-child(8), #tbl-age td:nth-child(8) { text-align: center; }
-  #tbl-age th.col-separator, #tbl-age td.col-separator { padding-left: 0.75rem; }
-  #tbl-age th:nth-child(4), #tbl-age td:nth-child(4) { border-right: 24px solid var(--bg-white); }
+  /* Sous-titres au-dessus de chaque sous-tableau (Plus jeunes / Plus âgé(e)s) */
+  .table-subtitle {
+    font-weight: 600;
+    color: var(--primary-color);
+    margin: 0.75rem 0 0.375rem;
+    font-size: 0.95rem;
+  }
+  .table-subtitle:first-of-type { margin-top: 0; }
+
+  /* Sélecteur de filtre course (10 km / 20 km / Toutes) au-dessus des tableaux d'âges extrêmes */
+  .age-filter {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.95rem;
+  }
+  .age-filter a {
+    text-decoration: none;
+    color: var(--text-dark);
+    cursor: pointer;
+  }
+  .age-filter a[data-course="10"] { color: var(--primary-color); }
+  .age-filter a[data-course="20"] { color: var(--secondary-color); }
+  .age-filter a.active { font-weight: 700; text-decoration: underline; }
+  .age-filter .sep { color: var(--text-dark); opacity: 0.5; }
+
+  /* Tableaux "âges extrêmes" (pleine largeur, empilés) : largeurs de colonnes fixes et identiques entre les 2 tableaux */
+  .tbl-age-extreme { table-layout: fixed; }
+  .tbl-age-extreme th:nth-child(1), .tbl-age-extreme td:nth-child(1) { width: 8%; text-align: center; }
+  .tbl-age-extreme th:nth-child(2), .tbl-age-extreme td:nth-child(2) { width: 12%; text-align: center; }
+  .tbl-age-extreme th:nth-child(3), .tbl-age-extreme td:nth-child(3) { width: 18%; }
+  .tbl-age-extreme th:nth-child(4), .tbl-age-extreme td:nth-child(4) { width: 18%; }
+  .tbl-age-extreme th:nth-child(5), .tbl-age-extreme td:nth-child(5) { width: 24%; }
+  .tbl-age-extreme th:nth-child(6), .tbl-age-extreme td:nth-child(6) { width: 20%; text-align: center; }
+  .tbl-age-extreme th:nth-child(7), .tbl-age-extreme td:nth-child(7) { width: 10%; text-align: center; }
+  .tbl-age-extreme td { overflow: hidden; text-overflow: ellipsis; }
+
+  /* Date de naissance affichée en gris entre parenthèses, à côté de l'âge */
+  .age-birthdate { color: var(--text-muted); }
 
   #tbl-clubs th:nth-child(1), #tbl-clubs td:nth-child(1),
   #tbl-clubs th:nth-child(3), #tbl-clubs td:nth-child(3) { text-align: center; }
@@ -63,9 +96,43 @@
     margin-top: 1rem;
   }
 
+  /* Grille de graphiques (exploitant les données du Tableau 1) */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+  }
+  /* min-width/min-height: 0 corrige le "grid blowout" : sans ça, un <canvas> (taille
+     intrinsèque 300x150 par défaut) peut forcer la grille à dépasser le conteneur
+     et provoquer des barres de défilement horizontale/verticale sur la page. */
+  .chart-box {
+    position: relative;
+    height: 280px;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .chart-box-wide {
+    grid-column: 1 / -1;
+    height: 260px;
+  }
+  .chart-box canvas {
+    max-width: 100%;
+  }
+  .chart-caption {
+    text-align: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 0.5rem;
+  }
+
   @media (max-width: 768px) {
     table { min-width: auto; }
     .table-title { flex-direction: column; }
+    .charts-grid { grid-template-columns: 1fr; }
+    .chart-box { height: 240px; }
+    .chart-box-wide { height: 220px; }
   }
 </style>
 </head>
@@ -100,20 +167,73 @@
     </table>
   </div>
 
-  <!-- Tableau 2 : Âges (10 km / 20 km) -->
+  <!-- Graphiques : exploitation visuelle des données du Tableau 1 -->
   <div class="table-container">
     <div class="table-title">
-      <span>Plus et moins âgés 10 km</span>
-      <span>Plus et moins âgés 20 km</span>
+      <span>Graphiques</span>
+      <nav class="age-filter" id="chart-filter" aria-label="Filtrer les graphiques par course">
+        <a href="#" data-course="10" class="filter-chart-course">10 km</a>
+        <span class="sep">•</span>
+        <a href="#" data-course="20" class="filter-chart-course">20 km</a>
+        <span class="sep">•</span>
+        <a href="#" data-course="all" class="filter-chart-course active">Toutes</a>
+      </nav>
     </div>
-    <table id="tbl-age">
+    <div class="charts-grid">
+      <div class="chart-box chart-box-wide">
+        <div class="chart-caption">Distribution des effectifs par catégorie (courbe)</div>
+        <canvas id="chart-cat-curve"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-caption">Répartition Femmes / Hommes par catégorie</div>
+        <canvas id="chart-cat-gender"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-caption">Répartition 10 km / 20 km par catégorie</div>
+        <canvas id="chart-cat-course"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-caption">Répartition globale par genre</div>
+        <canvas id="chart-gender-donut"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-caption">Répartition globale par course</div>
+        <canvas id="chart-course-donut"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tableau 2 : Âges extrêmes (filtrable par course) -->
+  <div class="table-container">
+    <div class="table-title">
+      <span>Âges extrêmes</span>
+      <nav class="age-filter" id="age-filter" aria-label="Filtrer par course">
+        <a href="#" data-course="10" class="filter-course">10 km</a>
+        <span class="sep">•</span>
+        <a href="#" data-course="20" class="filter-course">20 km</a>
+        <span class="sep">•</span>
+        <a href="#" data-course="all" class="filter-course active">Toutes</a>
+      </nav>
+    </div>
+
+    <div class="table-subtitle">Plus jeunes</div>
+    <table id="tbl-age-young" class="tbl-age-extreme">
       <thead>
         <tr>
-          <th>Dossard</th><th>Prénom</th><th>Nom</th><th>Âge</th>
-          <th class="col-separator">Dossard</th><th>Prénom</th><th>Nom</th><th>Âge</th>
+          <th>Genre</th><th>Dossard</th><th>Prénom</th><th>Nom</th><th>Club</th><th>Âge</th><th>Course</th>
         </tr>
       </thead>
-      <tbody><tr><td colspan="8" class="muted">Chargement…</td></tr></tbody>
+      <tbody><tr><td colspan="7" class="muted">Chargement…</td></tr></tbody>
+    </table>
+
+    <div class="table-subtitle">Plus âgé(e)s</div>
+    <table id="tbl-age-old" class="tbl-age-extreme">
+      <thead>
+        <tr>
+          <th>Genre</th><th>Dossard</th><th>Prénom</th><th>Nom</th><th>Club</th><th>Âge</th><th>Course</th>
+        </tr>
+      </thead>
+      <tbody><tr><td colspan="7" class="muted">Chargement…</td></tr></tbody>
     </table>
   </div>
 
@@ -136,6 +256,7 @@
 <script src="svg-animation.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
 (function () {
   'use strict';
@@ -171,10 +292,19 @@
 
   const el = {
     cat: document.querySelector('#tbl-cat tbody'),
-    age: document.querySelector('#tbl-age tbody'),
+    ageYoung: document.querySelector('#tbl-age-young tbody'),
+    ageOld: document.querySelector('#tbl-age-old tbody'),
     clubs: document.querySelector('#tbl-clubs tbody'),
     err: document.getElementById('err')
   };
+
+  let participants = {};
+
+  // Filtre course actif pour le tableau des âges extrêmes : '10', '20' ou 'all'
+  let ageCourseFilter = 'all';
+
+  // Filtre course actif pour les graphiques : '10', '20' ou 'all'
+  let chartCourseFilter = 'all';
 
   const ORDER_CAT = ['CA', 'JU', 'ES', 'SE', 'M0', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10'];
 
@@ -234,26 +364,42 @@
   const pct = (part, total) => Math.round((100 * part) / (total || 1));
   const fmt = (v) => (v === 0 ? '<span class="zero">0</span>' : v);
 
-  // --- Tableau 1 : répartition par catégories -------------------------
-  function renderCats(body, data) {
+  /** Formate une date en "JJ/MM/AAAA". */
+  function formatDateFR(d) {
+    if (!d || isNaN(d.getTime())) return '';
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  }
+
+  // --- Calcul partagé (Tableau 1 + Graphiques) : répartition F/H par catégorie et par course -----------
+  function computeCategoryStats(data) {
     const counts = { 10: {}, 20: {} };
 
     Object.values(data || {}).forEach((p) => {
       const course = getCourseNumber(p);
+      if (course !== 10 && course !== 20) return; // ignore les inscriptions sans course valide
       const cat = p.categorie || '—';
-      counts[course] = counts[course] || {};
       counts[course][cat] = counts[course][cat] || { f: 0, h: 0 };
       isFemale(p) ? counts[course][cat].f++ : counts[course][cat].h++;
     });
 
     const totaux = { 10: { f: 0, h: 0 }, 20: { f: 0, h: 0 } };
+    ORDER_CAT.forEach((cat) => {
+      const v10 = counts[10][cat] || { f: 0, h: 0 };
+      const v20 = counts[20][cat] || { f: 0, h: 0 };
+      totaux[10].f += v10.f; totaux[10].h += v10.h;
+      totaux[20].f += v20.f; totaux[20].h += v20.h;
+    });
+
+    return { counts, totaux };
+  }
+
+  // --- Tableau 1 : répartition par catégories -------------------------
+  function renderCats(body, stats) {
+    const { counts, totaux } = stats;
 
     const rows = ORDER_CAT.map((cat) => {
       const v10 = counts[10][cat] || { f: 0, h: 0 };
       const v20 = counts[20][cat] || { f: 0, h: 0 };
-
-      totaux[10].f += v10.f; totaux[10].h += v10.h;
-      totaux[20].f += v20.f; totaux[20].h += v20.h;
 
       return `
         <tr>
@@ -293,44 +439,259 @@
     body.innerHTML = rows.join('');
   }
 
-  // --- Tableau 2 : plus jeunes / plus âgés par course ------------------
-  function renderAges(body, data) {
-    const ages = { 10: [], 20: [] };
+  // --- Graphiques (exploitent les mêmes données que le Tableau 1) -----------------------
+  const CHART_COLORS = {
+    femmes: '#E61780', // --secondary-color
+    hommes: '#215E99', // --primary-color
+    km10: '#215E99',   // --primary-color
+    km20: '#E61780'    // --secondary-color
+  };
+
+  let chartCatCurve = null;
+  let chartCatGender = null;
+  let chartCatCourse = null;
+  let chartGenderDonut = null;
+  let chartCourseDonut = null;
+
+  const chartTooltipWithPct = {
+    callbacks: {
+      label(ctx) {
+        const value = ctx.parsed.y ?? ctx.parsed;
+        const dataArr = ctx.dataset.data;
+        const total = dataArr.reduce((a, b) => a + b, 0);
+        const percent = total ? Math.round((100 * value) / total) : 0;
+        return ` ${ctx.dataset.label ?? ctx.label} : ${value} (${percent}%)`;
+      }
+    }
+  };
+
+  // courseFilter : 'all', '10' ou '20' — s'applique aux graphiques basés sur le genre
+  // (courbe de distribution + répartition F/H par catégorie + donut F/H global).
+  // Les graphiques comparant explicitement 10 km vs 20 km restent volontairement non filtrés :
+  // filtrer sur une seule course viderait leur intérêt (comparer les deux distances).
+  function renderCharts(stats, courseFilter) {
+    if (typeof Chart === 'undefined') return; // Chart.js non chargé (ex: hors-ligne) : on ignore silencieusement
+
+    const { counts, totaux } = stats;
+
+    // Valeur F/H d'une catégorie selon le filtre course actif
+    const getFH = (cat) => {
+      if (courseFilter === '10') return counts[10][cat] || { f: 0, h: 0 };
+      if (courseFilter === '20') return counts[20][cat] || { f: 0, h: 0 };
+      const v10 = counts[10][cat] || { f: 0, h: 0 };
+      const v20 = counts[20][cat] || { f: 0, h: 0 };
+      return { f: v10.f + v20.f, h: v10.h + v20.h };
+    };
+
+    // Ne garde que les catégories réellement représentées pour le filtre actif (évite les barres/points vides)
+    const activeCats = ORDER_CAT.filter((cat) => {
+      const v = getFH(cat);
+      return (v.f + v.h) > 0;
+    });
+
+    const femmesByCat = activeCats.map((cat) => getFH(cat).f);
+    const hommesByCat = activeCats.map((cat) => getFH(cat).h);
+    const totalByCat = activeCats.map((cat) => getFH(cat).f + getFH(cat).h);
+
+    // Catégories/totaux toujours "Toutes courses" pour les 2 graphiques de comparaison 10km/20km (non filtrés)
+    const activeCatsAll = ORDER_CAT.filter((cat) => {
+      const v10 = counts[10][cat] || { f: 0, h: 0 };
+      const v20 = counts[20][cat] || { f: 0, h: 0 };
+      return (v10.f + v10.h + v20.f + v20.h) > 0;
+    });
+    const km10ByCat = activeCatsAll.map((cat) => {
+      const v = counts[10][cat] || { f: 0, h: 0 };
+      return v.f + v.h;
+    });
+    const km20ByCat = activeCatsAll.map((cat) => {
+      const v = counts[20][cat] || { f: 0, h: 0 };
+      return v.f + v.h;
+    });
+
+    // --- Graphique 0 : distribution des effectifs par catégorie (barres) ---
+    const catCurveConfig = {
+      type: 'bar',
+      data: {
+        labels: activeCats,
+        datasets: [{
+          label: 'Participants',
+          data: totalByCat,
+          backgroundColor: CHART_COLORS.hommes,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ` ${ctx.parsed.y} participant(s)`
+            }
+          }
+        }
+      }
+    };
+    if (chartCatCurve) {
+      chartCatCurve.data = catCurveConfig.data;
+      chartCatCurve.update();
+    } else {
+      chartCatCurve = new Chart(document.getElementById('chart-cat-curve'), catCurveConfig);
+    }
+
+    // --- Graphique 1 : barres empilées Femmes/Hommes par catégorie ---
+    const catGenderConfig = {
+      type: 'bar',
+      data: {
+        labels: activeCats,
+        datasets: [
+          { label: 'Femmes', data: femmesByCat, backgroundColor: CHART_COLORS.femmes },
+          { label: 'Hommes', data: hommesByCat, backgroundColor: CHART_COLORS.hommes }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } },
+        plugins: { tooltip: chartTooltipWithPct }
+      }
+    };
+    if (chartCatGender) {
+      chartCatGender.data = catGenderConfig.data;
+      chartCatGender.update();
+    } else {
+      chartCatGender = new Chart(document.getElementById('chart-cat-gender'), catGenderConfig);
+    }
+
+    // --- Graphique 2 : barres groupées 10km/20km par catégorie (toujours "Toutes", non filtré) ---
+    const catCourseConfig = {
+      type: 'bar',
+      data: {
+        labels: activeCatsAll,
+        datasets: [
+          { label: '10 km', data: km10ByCat, backgroundColor: CHART_COLORS.km10 },
+          { label: '20 km', data: km20ByCat, backgroundColor: CHART_COLORS.km20 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+        plugins: { tooltip: chartTooltipWithPct }
+      }
+    };
+    if (chartCatCourse) {
+      chartCatCourse.data = catCourseConfig.data;
+      chartCatCourse.update();
+    } else {
+      chartCatCourse = new Chart(document.getElementById('chart-cat-course'), catCourseConfig);
+    }
+
+    // --- Graphique 3 : donut Femmes/Hommes (respecte le filtre course actif) ---
+    const totalFemmes = femmesByCat.reduce((a, b) => a + b, 0);
+    const totalHommes = hommesByCat.reduce((a, b) => a + b, 0);
+    const genderDonutConfig = {
+      type: 'doughnut',
+      data: {
+        labels: ['Femmes', 'Hommes'],
+        datasets: [{ data: [totalFemmes, totalHommes], backgroundColor: [CHART_COLORS.femmes, CHART_COLORS.hommes] }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { tooltip: chartTooltipWithPct }
+      }
+    };
+    if (chartGenderDonut) {
+      chartGenderDonut.data = genderDonutConfig.data;
+      chartGenderDonut.update();
+    } else {
+      chartGenderDonut = new Chart(document.getElementById('chart-gender-donut'), genderDonutConfig);
+    }
+
+    // --- Graphique 4 : donut 10km/20km (global) ---
+    const total10 = totaux[10].f + totaux[10].h;
+    const total20 = totaux[20].f + totaux[20].h;
+    const courseDonutConfig = {
+      type: 'doughnut',
+      data: {
+        labels: ['10 km', '20 km'],
+        datasets: [{ data: [total10, total20], backgroundColor: [CHART_COLORS.km10, CHART_COLORS.km20] }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { tooltip: chartTooltipWithPct }
+      }
+    };
+    if (chartCourseDonut) {
+      chartCourseDonut.data = courseDonutConfig.data;
+      chartCourseDonut.update();
+    } else {
+      chartCourseDonut = new Chart(document.getElementById('chart-course-donut'), courseDonutConfig);
+    }
+  }
+
+  // --- Tableau 2 : plus jeunes / plus âgé(e)s (Femme + Homme), filtrable par course ------------------
+  function renderAges(bodyYoung, bodyOld, data, courseFilter) {
+    const women = [], men = [];
 
     Object.entries(data || {}).forEach(([dossard, p]) => {
       const course = getCourseNumber(p);
-      if (course !== 10 && course !== 20) return;
+      if (course !== 10 && course !== 20) return; // uniquement les participants inscrits sur une course valide
+      if (courseFilter !== 'all' && course !== Number(courseFilter)) return; // filtre course sélectionné
 
       const birth = parseDate(p.naissance);
       const age = computeAge(birth);
       if (age === null) return; // date invalide ou absente
 
-      ages[course].push({ dossard, prenom: p.prenom || '', nom: p.nom || '', age, birth });
+      const entry = {
+        dossard,
+        prenom: p.prenom || '',
+        nom: p.nom || '',
+        club: p.club || '',
+        course,
+        age,
+        birth
+      };
+      (isFemale(p) ? women : men).push(entry);
     });
 
-    if (!ages[10].length && !ages[20].length) {
-      body.innerHTML = '<tr><td colspan="8" class="muted">Aucune donnée d\'âge disponible.</td></tr>';
+    if (!women.length && !men.length) {
+      const emptyRow = '<tr><td colspan="7" class="muted">Aucune donnée d\'âge disponible pour ce filtre.</td></tr>';
+      bodyYoung.innerHTML = emptyRow;
+      bodyOld.innerHTML = emptyRow;
       return;
     }
 
     function getOldestYoungest(arr) {
       if (!arr.length) return [null, null];
       const sorted = arr.slice().sort((a, b) => a.birth.getTime() - b.birth.getTime());
-      return [sorted[0], sorted[sorted.length - 1]]; // [plus âgé, plus jeune]
+      return [sorted[sorted.length - 1], sorted[0]]; // [plus âgé(e), plus jeune]
     }
 
-    const [oldest10, youngest10] = getOldestYoungest(ages[10]);
-    const [oldest20, youngest20] = getOldestYoungest(ages[20]);
+    const [oldestWoman, youngestWoman] = getOldestYoungest(women);
+    const [oldestMan, youngestMan] = getOldestYoungest(men);
 
     const cell = (p, key) => (p ? p[key] ?? '' : '');
+    const ageCell = p => (p ? `${p.age} <span class="age-birthdate">(${escapeHtml(formatDateFR(p.birth))})</span>` : '');
+    const courseCell = p => (p ? `${p.course} km` : '');
 
-    const rowFor = (p10, p20) => `
+    const rowFor = (genre, p) => `
       <tr>
-        <td>${escapeHtml(cell(p10, 'dossard'))}</td><td>${escapeHtml(cell(p10, 'prenom'))}</td><td>${escapeHtml(cell(p10, 'nom'))}</td><td>${cell(p10, 'age')}</td>
-        <td class="col-separator">${escapeHtml(cell(p20, 'dossard'))}</td><td>${escapeHtml(cell(p20, 'prenom'))}</td><td>${escapeHtml(cell(p20, 'nom'))}</td><td>${cell(p20, 'age')}</td>
+        <td>${genre}</td>
+        <td>${escapeHtml(cell(p, 'dossard'))}</td>
+        <td>${escapeHtml(cell(p, 'prenom'))}</td>
+        <td>${escapeHtml(cell(p, 'nom'))}</td>
+        <td>${escapeHtml(cell(p, 'club'))}</td>
+        <td>${ageCell(p)}</td>
+        <td>${courseCell(p)}</td>
       </tr>`;
 
-    body.innerHTML = rowFor(oldest10, oldest20) + rowFor(youngest10, youngest20);
+    bodyYoung.innerHTML = rowFor('F', youngestWoman) + rowFor('H', youngestMan);
+    bodyOld.innerHTML = rowFor('F', oldestWoman) + rowFor('H', oldestMan);
   }
 
   // --- Tableau 3 : classement des clubs --------------------------------
@@ -356,17 +717,46 @@
     el.err.textContent = msg;
   }
 
-  // --- Écoute temps réel -----------------------------------------------
-  safeListener(db.ref('participants'), (snap) => {
+  // Ré-exécute les rendus dépendant des participants (catégories, graphiques, âges, clubs)
+  function renderAll() {
     try {
-      const data = snap.val() || {};
-      renderCats(el.cat, data);
-      renderAges(el.age, data);
-      renderClubs(el.clubs, data);
+      const catStats = computeCategoryStats(participants);
+      renderCats(el.cat, catStats);
+      renderCharts(catStats, chartCourseFilter);
+      renderAges(el.ageYoung, el.ageOld, participants, ageCourseFilter);
+      renderClubs(el.clubs, participants);
     } catch (e) {
       console.error(e);
       showError('Erreur traitement : ' + e.message);
     }
+  }
+
+  // --- Filtre course (10 km / 20 km / Toutes) pour le tableau des âges extrêmes ---
+  document.querySelectorAll('#age-filter .filter-course').forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      ageCourseFilter = link.dataset.course;
+      document.querySelectorAll('#age-filter .filter-course').forEach(a => a.classList.remove('active'));
+      link.classList.add('active');
+      renderAll();
+    });
+  });
+
+  // --- Filtre course (10 km / 20 km / Toutes) pour les graphiques ---
+  document.querySelectorAll('#chart-filter .filter-chart-course').forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      chartCourseFilter = link.dataset.course;
+      document.querySelectorAll('#chart-filter .filter-chart-course').forEach(a => a.classList.remove('active'));
+      link.classList.add('active');
+      renderAll();
+    });
+  });
+
+  // --- Écoute temps réel -----------------------------------------------
+  safeListener(db.ref('participants'), (snap) => {
+    participants = snap.val() || {};
+    renderAll();
   }, (err) => {
     console.error(err);
     showError('Erreur Firebase : ' + err.message);
