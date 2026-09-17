@@ -38,9 +38,6 @@
     background: var(--bg-total);
   }
 
-  /* Séparateurs verticaux entre groupes de colonnes */
-  .col-separator { border-left: 2px solid var(--primary-color); }
-
   #tbl-cat th, #tbl-cat td { text-align: center; }
   #tbl-cat tbody td:nth-child(2),
   #tbl-cat tbody td:nth-child(5),
@@ -104,20 +101,22 @@
   }
   /* min-width/min-height: 0 corrige le "grid blowout" : sans ça, un <canvas> (taille
      intrinsèque 300x150 par défaut) peut forcer la grille à dépasser le conteneur
-     et provoquer des barres de défilement horizontale/verticale sur la page. */
+     et provoquer des barres de défilement horizontale/verticale sur la page.
+     La disposition en colonne (flex) sépare le titre de la zone du graphique : c'est
+     ce wrapper dédié (.chart-canvas-wrapper), et non toute la boîte, que Chart.js mesure
+     pour dimensionner le canvas — évitant ainsi que l'axe des abscisses soit rogné. */
   .chart-box {
-    position: relative;
+    display: flex;
+    flex-direction: column;
     height: 280px;
     min-width: 0;
     min-height: 0;
-    overflow: hidden;
   }
-  .chart-box-wide {
-    grid-column: 1 / -1;
-    height: 260px;
-  }
-  .chart-box canvas {
-    max-width: 100%;
+  .chart-canvas-wrapper {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
   }
   .chart-caption {
     text-align: center;
@@ -125,6 +124,7 @@
     font-weight: 600;
     color: var(--text-dark);
     margin-bottom: 0.5rem;
+    flex: 0 0 auto;
   }
 
   @media (max-width: 768px) {
@@ -132,12 +132,10 @@
     .table-title { flex-direction: column; }
     .charts-grid { grid-template-columns: 1fr; }
     .chart-box { height: 240px; }
-    .chart-box-wide { height: 220px; }
   }
 </style>
 </head>
 <body>
-
 <div class="container">
   <div class="header">
 <div class="svg-wrapper">
@@ -180,25 +178,21 @@
       </nav>
     </div>
     <div class="charts-grid">
-      <div class="chart-box chart-box-wide">
-        <div class="chart-caption">Distribution des effectifs par catégorie (courbe)</div>
-        <canvas id="chart-cat-curve"></canvas>
-      </div>
       <div class="chart-box">
         <div class="chart-caption">Répartition Femmes / Hommes par catégorie</div>
-        <canvas id="chart-cat-gender"></canvas>
+        <div class="chart-canvas-wrapper"><canvas id="chart-cat-gender"></canvas></div>
       </div>
       <div class="chart-box">
         <div class="chart-caption">Répartition 10 km / 20 km par catégorie</div>
-        <canvas id="chart-cat-course"></canvas>
+        <div class="chart-canvas-wrapper"><canvas id="chart-cat-course"></canvas></div>
       </div>
       <div class="chart-box">
         <div class="chart-caption">Répartition globale par genre</div>
-        <canvas id="chart-gender-donut"></canvas>
+        <div class="chart-canvas-wrapper"><canvas id="chart-gender-donut"></canvas></div>
       </div>
       <div class="chart-box">
         <div class="chart-caption">Répartition globale par course</div>
-        <canvas id="chart-course-donut"></canvas>
+        <div class="chart-canvas-wrapper"><canvas id="chart-course-donut"></canvas></div>
       </div>
     </div>
   </div>
@@ -440,14 +434,18 @@
   }
 
   // --- Graphiques (exploitent les mêmes données que le Tableau 1) -----------------------
+  // Couleurs lues directement depuis les variables CSS du thème (common.css), plutôt que
+  // dupliquées en dur ici : tout changement de charte graphique se répercute automatiquement.
+  const rootStyles = getComputedStyle(document.documentElement);
+  const COLOR_PRIMARY = rootStyles.getPropertyValue('--primary-color').trim() || '#215E99';
+  const COLOR_SECONDARY = rootStyles.getPropertyValue('--secondary-color').trim() || '#E61780';
   const CHART_COLORS = {
-    femmes: '#E61780', // --secondary-color
-    hommes: '#215E99', // --primary-color
-    km10: '#215E99',   // --primary-color
-    km20: '#E61780'    // --secondary-color
+    femmes: COLOR_SECONDARY,
+    hommes: COLOR_PRIMARY,
+    km10: COLOR_PRIMARY,
+    km20: COLOR_SECONDARY
   };
 
-  let chartCatCurve = null;
   let chartCatGender = null;
   let chartCatCourse = null;
   let chartGenderDonut = null;
@@ -466,80 +464,39 @@
   };
 
   // courseFilter : 'all', '10' ou '20' — s'applique aux graphiques basés sur le genre
-  // (courbe de distribution + répartition F/H par catégorie + donut F/H global).
+  // (répartition F/H par catégorie + donut F/H global).
   // Les graphiques comparant explicitement 10 km vs 20 km restent volontairement non filtrés :
   // filtrer sur une seule course viderait leur intérêt (comparer les deux distances).
   function renderCharts(stats, courseFilter) {
     if (typeof Chart === 'undefined') return; // Chart.js non chargé (ex: hors-ligne) : on ignore silencieusement
 
     const { counts, totaux } = stats;
+    const hasParticipants = (v) => (v.f + v.h) > 0;
+    const sumFH = (v) => v.f + v.h;
 
-    // Valeur F/H d'une catégorie selon le filtre course actif
-    const getFH = (cat) => {
-      if (courseFilter === '10') return counts[10][cat] || { f: 0, h: 0 };
-      if (courseFilter === '20') return counts[20][cat] || { f: 0, h: 0 };
+    // Valeur F/H d'une catégorie, toutes courses confondues (10 km + 20 km)
+    const getFHAllCourses = (cat) => {
       const v10 = counts[10][cat] || { f: 0, h: 0 };
       const v20 = counts[20][cat] || { f: 0, h: 0 };
       return { f: v10.f + v20.f, h: v10.h + v20.h };
     };
 
-    // Ne garde que les catégories réellement représentées pour le filtre actif (évite les barres/points vides)
-    const activeCats = ORDER_CAT.filter((cat) => {
-      const v = getFH(cat);
-      return (v.f + v.h) > 0;
-    });
+    // Valeur F/H d'une catégorie selon le filtre course actif ('10', '20' ou 'all')
+    const getFH = (cat) => {
+      if (courseFilter === '10') return counts[10][cat] || { f: 0, h: 0 };
+      if (courseFilter === '20') return counts[20][cat] || { f: 0, h: 0 };
+      return getFHAllCourses(cat);
+    };
 
+    // Ne garde que les catégories réellement représentées pour le filtre actif (évite les barres vides)
+    const activeCats = ORDER_CAT.filter((cat) => hasParticipants(getFH(cat)));
     const femmesByCat = activeCats.map((cat) => getFH(cat).f);
     const hommesByCat = activeCats.map((cat) => getFH(cat).h);
-    const totalByCat = activeCats.map((cat) => getFH(cat).f + getFH(cat).h);
 
     // Catégories/totaux toujours "Toutes courses" pour les 2 graphiques de comparaison 10km/20km (non filtrés)
-    const activeCatsAll = ORDER_CAT.filter((cat) => {
-      const v10 = counts[10][cat] || { f: 0, h: 0 };
-      const v20 = counts[20][cat] || { f: 0, h: 0 };
-      return (v10.f + v10.h + v20.f + v20.h) > 0;
-    });
-    const km10ByCat = activeCatsAll.map((cat) => {
-      const v = counts[10][cat] || { f: 0, h: 0 };
-      return v.f + v.h;
-    });
-    const km20ByCat = activeCatsAll.map((cat) => {
-      const v = counts[20][cat] || { f: 0, h: 0 };
-      return v.f + v.h;
-    });
-
-    // --- Graphique 0 : distribution des effectifs par catégorie (barres) ---
-    const catCurveConfig = {
-      type: 'bar',
-      data: {
-        labels: activeCats,
-        datasets: [{
-          label: 'Participants',
-          data: totalByCat,
-          backgroundColor: CHART_COLORS.hommes,
-          borderRadius: 4
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => ` ${ctx.parsed.y} participant(s)`
-            }
-          }
-        }
-      }
-    };
-    if (chartCatCurve) {
-      chartCatCurve.data = catCurveConfig.data;
-      chartCatCurve.update();
-    } else {
-      chartCatCurve = new Chart(document.getElementById('chart-cat-curve'), catCurveConfig);
-    }
+    const activeCatsAll = ORDER_CAT.filter((cat) => hasParticipants(getFHAllCourses(cat)));
+    const km10ByCat = activeCatsAll.map((cat) => sumFH(counts[10][cat] || { f: 0, h: 0 }));
+    const km20ByCat = activeCatsAll.map((cat) => sumFH(counts[20][cat] || { f: 0, h: 0 }));
 
     // --- Graphique 1 : barres empilées Femmes/Hommes par catégorie ---
     const catGenderConfig = {
@@ -763,6 +720,5 @@
   });
 })();
 </script>
-
 </body>
 </html>
